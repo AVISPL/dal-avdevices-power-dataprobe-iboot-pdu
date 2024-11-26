@@ -36,6 +36,7 @@ import com.avispl.symphony.api.dal.control.Controller;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.dto.monitor.ExtendedStatistics;
 import com.avispl.symphony.api.dal.dto.monitor.Statistics;
+import com.avispl.symphony.api.dal.error.ResourceNotReachableException;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.dal.communicator.RestCommunicator;
 import com.avispl.symphony.dal.util.StringUtils;
@@ -115,20 +116,42 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		return objectMapper.readTree(new File(filePath));
 	}
 
+//	/**
+//	 * {@inheritDoc}
+//	 */
+//	@Override
+//	protected void authenticate() throws Exception {
+//		String jsonPayload = String.format(DataprobeConstant.AUTHENTICATION_PARAM, this.getLogin(), this.getPassword());
+//		JsonNode response = this.doPost(DataprobeCommand.API_LOGIN, jsonPayload, JsonNode.class);
+//		if(response.has("success")){
+//			if (response.at("/success").asBoolean()){
+//				this.loginInfo.setToken(response.at("/token").asText());
+//			} else {
+//				loginInfo = null;
+//				throw new InvalidCredentialsException(response.at("/message").asText());
+//			}
+//		}
+//	}
+
 	/**
 	 * {@inheritDoc}
 	 */
 	@Override
 	protected void authenticate() throws Exception {
 		String jsonPayload = String.format(DataprobeConstant.AUTHENTICATION_PARAM, this.getLogin(), this.getPassword());
-		JsonNode response = this.doPost(DataprobeCommand.API_LOGIN, jsonPayload, JsonNode.class);
-		if(response.has("success")){
-			if (response.at("/success").asBoolean()){
-				this.loginInfo.setToken(response.at("/token").asText());
-			} else {
-				loginInfo = null;
-				throw new InvalidCredentialsException(response.at("/message").asText());
+		try {
+			String result = this.doPost(DataprobeCommand.API_LOGIN, jsonPayload);
+			JsonNode response = objectMapper.readTree(result);
+			if (response.has("success")) {
+				if (response.at("/success").asBoolean()) {
+					this.loginInfo.setToken(response.at("/token").asText());
+				} else {
+					loginInfo = null;
+					throw new InvalidCredentialsException(response.at("/message").asText());
+				}
 			}
+		} catch (Exception e) {
+			throw new FailedLoginException("Auth error when get token api" + e);
 		}
 	}
 
@@ -162,7 +185,11 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 */
 	@Override
 	protected HttpHeaders putExtraRequestHeaders(HttpMethod httpMethod, String uri, HttpHeaders headers) throws Exception {
-		headers.set("Content-Type", "application/json");
+		if (httpMethod == HttpMethod.GET || uri.contains("/html-endpoint")) {
+			headers.set("Content-Type", "text/html; charset=UTF-8");
+		} else {
+			headers.set("Content-Type", "application/json");
+		}
 		return headers;
 	}
 
@@ -316,15 +343,8 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private void retrieveName() throws Exception{
 //		JsonNode namesResponse = loadMockData("src/main/java/com/insightsystems/symphony/dal/dataprobe/common/mockdata/mockdata.json");
 		String jsonPayload = String.format(DataprobeConstant.RETRIEVE_NAME, this.loginInfo.getToken());
-		JsonNode namesResponse = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload, JsonNode.class);
-		if(!namesResponse.at("/success").asBoolean()){
-			if (namesResponse.at("/message").asText().contains(DataprobeConstant.INVALID_TOKEN)
-					|| namesResponse.at("/message").asText().contains(DataprobeConstant.INVALID_TOKEN)){
-				this.authenticate();
-				namesResponse = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload, JsonNode.class);
-			}
-			checkForErrors(namesResponse);
-		}
+		String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload);
+		JsonNode namesResponse = objectMapper.readTree(result);
 		if (namesResponse.has("names")){
 			JsonNode namesJson = namesResponse.at("/names");
 			if (namesJson.has("outletNames") && namesJson.has("groupNames")){
@@ -350,8 +370,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	private void getOutletStates(Map<String, String> stats, List<AdvancedControllableProperty> controls) throws Exception {
-		JsonNode stateResponse = loadMockData("src/main/java/com/insightsystems/symphony/dal/dataprobe/common/mockdata/mockupstatus.json");
-//		JsonNode stateResponse = objectMapper.readTree(this.doPost("/services/retrieve/", createJsonRetrieveString()));
+//		JsonNode stateResponse = loadMockData("src/main/java/com/insightsystems/symphony/dal/dataprobe/common/mockdata/mockupstatus.json");
+		String result = this.doPost("/services/retrieve/", createJsonRetrieveString());
+		JsonNode stateResponse = objectMapper.readTree(result);
 		checkForErrors(stateResponse);
 		if (stateResponse.has("outlets")){
 			JsonNode outletStates = stateResponse.at("/outlets");
@@ -531,14 +552,23 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 
 			if (controlObject != null){
-				String controlResponse = this.doPost("services/control/",objectMapper.writeValueAsString(controlObject));
-				checkForErrors(objectMapper.readTree(controlResponse));
+				handleControl(controlObject);
 			}
 
 		} finally {
 			reentrantLock.unlock();
 		}
 	}
+
+	private void handleControl(ControlObject controlObject){
+		try {
+			String controlResponse = this.doPost(DataprobeCommand.CONTROL,objectMapper.writeValueAsString(controlObject));
+			checkForErrors(objectMapper.readTree(controlResponse));
+		} catch (Exception e ){
+			throw new ResourceNotReachableException("", e);
+		}
+	}
+
 
 	/**
 	 * {@inheritDoc}

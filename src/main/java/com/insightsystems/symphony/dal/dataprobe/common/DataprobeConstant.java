@@ -17,7 +17,7 @@ public class DataprobeConstant {
 	public static final String OUTLET_CONTROL = "OutletControl";
 	public static final String STATUS = "Status";
 	public static final String HASH = "#";
-	public static final String INVALID_TOKEN = "invalid_token";
+	public static final String INVALID_TOKEN = "invalid token";
 
 	public static final String MONITORED_DEVICES_TOTAL = "MonitoredDevicesTotal";
 	public static final String MONITORING_CYCLE_DURATION = "LastMonitoringCycleDuration(s)";
