@@ -33,11 +33,11 @@ public class DataprobeiBootPDUCommunicatorTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		dataprobeiBootPDUCommunicator = new DataprobeiBootPDUCommunicator();
-		dataprobeiBootPDUCommunicator.setHost("10.100.0.202");
+		dataprobeiBootPDUCommunicator.setHost("");
 		dataprobeiBootPDUCommunicator.setPort(80);
 		dataprobeiBootPDUCommunicator.setProtocol("http");
-		dataprobeiBootPDUCommunicator.setLogin("avispl");
-		dataprobeiBootPDUCommunicator.setPassword("313eezJyjH*^PeO1");
+		dataprobeiBootPDUCommunicator.setLogin("");
+		dataprobeiBootPDUCommunicator.setPassword("");
 		dataprobeiBootPDUCommunicator.init();
 		dataprobeiBootPDUCommunicator.connect();
 		dataprobeiBootPDUCommunicator.setSequenceProperties("01, 02, 03");
