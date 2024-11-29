@@ -33,13 +33,14 @@ public class DataprobeiBootPDUCommunicatorTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		dataprobeiBootPDUCommunicator = new DataprobeiBootPDUCommunicator();
-		dataprobeiBootPDUCommunicator.setHost("***REMOVED***");
+		dataprobeiBootPDUCommunicator.setHost("10.100.0.202");
 		dataprobeiBootPDUCommunicator.setPort(80);
 		dataprobeiBootPDUCommunicator.setProtocol("http");
-		dataprobeiBootPDUCommunicator.setLogin("");
-		dataprobeiBootPDUCommunicator.setPassword("");
+		dataprobeiBootPDUCommunicator.setLogin("avispl");
+		dataprobeiBootPDUCommunicator.setPassword("313eezJyjH*^PeO1");
 		dataprobeiBootPDUCommunicator.init();
 		dataprobeiBootPDUCommunicator.connect();
+		dataprobeiBootPDUCommunicator.setSequenceProperties("01, 02, 03");
 	}
 
 	@AfterEach
@@ -60,48 +61,61 @@ public class DataprobeiBootPDUCommunicatorTest {
 		ExtendedStatistics es = (ExtendedStatistics) statistics.get(0);
 
 		Map<String,String> stats = ((ExtendedStatistics)dataprobeiBootPDUCommunicator.getMultipleStatistics().get(0)).getStatistics();
-//		Assert.assertEquals("1",stats.get("1: Outlet-1"));
-//		Assert.assertEquals("1",stats.get("2: Outlet-2"));
-//		Assert.assertEquals("1",stats.get("3: Outlet-3"));
-//		Assert.assertEquals("1",stats.get("4: Outlet-4"));
-//		Assert.assertEquals("1",stats.get("5: Outlet-5"));
-//		Assert.assertEquals("1",stats.get("6: Outlet-6"));
-//		Assert.assertEquals("1",stats.get("7: Outlet-7"));
-//		Assert.assertEquals("1",stats.get("8: Outlet-8"));
+		Assert.assertEquals("1",stats.get("1: Outlet_1"));
+		Assert.assertEquals("1",stats.get("2: Outlet_2"));
+		Assert.assertEquals("1",stats.get("3: Outlet_3"));
+		Assert.assertEquals("1",stats.get("4: Outlet_4"));
+		Assert.assertEquals("1",stats.get("5: Outlet_5"));
+		Assert.assertEquals("1",stats.get("6: Outlet_6"));
+		Assert.assertEquals("1",stats.get("7: Outlet_7"));
+		Assert.assertEquals("1",stats.get("8: Outlet_8"));
 		System.out.println(stats);
+	}
+
+	@Test
+	public void testConfigSequence() throws Exception {
+		dataprobeiBootPDUCommunicator.getMultipleStatistics();
+		Thread.sleep(2000);
+		Map<String,String> stats = ((ExtendedStatistics)dataprobeiBootPDUCommunicator.getMultipleStatistics().get(0)).getStatistics();
+		System.out.println("Test: " + stats);
+	}
+
+	@Test
+	public void testSequence() throws Exception {
+		dataprobeiBootPDUCommunicator.getMultipleStatistics();
+		String updateSequence = "Sequence_01#Control";
+		ControllableProperty cp = new ControllableProperty();
+		cp.setProperty(updateSequence);
+		cp.setValue("run");
+		dataprobeiBootPDUCommunicator.controlProperty(cp);
+		Thread.sleep(8500);
+	}
+
+	@Test
+	public void testCycle() throws Exception {
+		dataprobeiBootPDUCommunicator.getMultipleStatistics();
+		String updateSequence = "Group_group01#Cycle";
+		ControllableProperty cp = new ControllableProperty();
+		cp.setProperty(updateSequence);
+		dataprobeiBootPDUCommunicator.controlProperty(cp);
+		Thread.sleep(10000);
 	}
 
 	@Test
 	public void testControls() throws Exception {
 		dataprobeiBootPDUCommunicator.getMultipleStatistics();
+		String fieldUpdate = "Group_group01#Status";
 		Map<String,String> stats = ((ExtendedStatistics)dataprobeiBootPDUCommunicator.getMultipleStatistics().get(0)).getStatistics();
 		System.out.println("Test: " + stats);
-		Assert.assertEquals("Off",stats.get("Outlet-8#Status"));
 
 		ControllableProperty cp = new ControllableProperty();
-		cp.setProperty("Outlet-8#Status");
-		cp.setValue("Off");
+		cp.setProperty(fieldUpdate);
+		cp.setValue("1");
 		dataprobeiBootPDUCommunicator.controlProperty(cp);
 
 		Thread.sleep(8500);
 
 		stats = ((ExtendedStatistics)dataprobeiBootPDUCommunicator.getMultipleStatistics().get(0)).getStatistics();
-		Assert.assertEquals("Off",stats.get("Outlet-8#Status"));
-
-		cp.setValue("On");
-		dataprobeiBootPDUCommunicator.controlProperty(cp);
-
-		Thread.sleep(8500);
-
-		stats = ((ExtendedStatistics)dataprobeiBootPDUCommunicator.getMultipleStatistics().get(0)).getStatistics();
-		Assert.assertEquals("On",stats.get("Outlet-8#Status"));
-	}
-
-	@Test
-	void testTimeLogin() throws Exception {
-		long exp = System.currentTimeMillis() / 1000 + 3600;
-		long iat = System.currentTimeMillis() / 1000;
-		System.out.println(exp);
-		System.out.println(iat);
+		Assert.assertEquals("On",stats.get(fieldUpdate));
 	}
 }

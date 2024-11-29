@@ -3,14 +3,23 @@
  */
 package com.insightsystems.symphony.dal.dataprobe;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
-import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty.DropDown;
 import com.avispl.symphony.api.dal.dto.monitor.GenericStatistics;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.CollectionUtils;
@@ -22,12 +31,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.insightsystems.symphony.dal.dataprobe.Serialisers.ControlObject;
 import com.insightsystems.symphony.dal.dataprobe.common.DataprobeCommand;
 import com.insightsystems.symphony.dal.dataprobe.common.DataprobeConstant;
-import com.insightsystems.symphony.dal.dataprobe.common.EnumTypeHandler;
 import com.insightsystems.symphony.dal.dataprobe.common.LoginInfo;
 import com.insightsystems.symphony.dal.dataprobe.common.metric.Group;
-import com.insightsystems.symphony.dal.dataprobe.common.metric.GroupsOptionEnum;
 import com.insightsystems.symphony.dal.dataprobe.common.metric.Outlet;
-import com.insightsystems.symphony.dal.dataprobe.common.metric.OutletsOptionEnum;
+import com.insightsystems.symphony.dal.dataprobe.common.metric.Sequence;
 import javax.security.auth.login.FailedLoginException;
 import org.apache.http.auth.InvalidCredentialsException;
 import org.openjdk.jol.info.ClassLayout;
@@ -42,15 +49,11 @@ import com.avispl.symphony.dal.communicator.RestCommunicator;
 import com.avispl.symphony.dal.util.StringUtils;
 
 /**
- *
  * @author Harry / Symphony Dev Team<br>
- * Created on 8/15/2024
+ * Created on 11/20/2024
  * @since 1.0.0
  */
 public class DataprobeiBootPDUCommunicator extends RestCommunicator implements Monitorable, Controller {
-
-
-
 	/**
 	 * ReentrantLock to prevent telnet session is closed when adapter is retrieving statistics from the device.
 	 */
@@ -61,7 +64,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 */
 	private ExtendedStatistics localExtendedStatistics;
 
-	/** Adapter metadata properties - adapter version and build date */
+	/**
+	 * Adapter metadata properties - adapter version and build date
+	 */
 	private Properties adapterProperties;
 
 	/**
@@ -81,10 +86,15 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private final Map<String, String> cacheValue = new HashMap<>();
 
 	/**
-	 *  genericStatistics represent the generic statistics
+	 * genericStatistics represent the generic statistics
 	 **/
 	private GenericStatistics genericStatistics = new GenericStatistics();
 
+	/**
+	 * A mapper for reading and writing JSON using Jackson library.
+	 * ObjectMapper provides functionality for converting between Java objects and JSON.
+	 * It can be used to serialize objects to JSON format, and deserialize JSON data to objects.
+	 */
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/**
@@ -94,13 +104,44 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * List name of Groups
-	 * */
+	 */
 	private final List<String> groupNames = new ArrayList<>();
 
 	/**
+	 * Configurable property for sequence properties, comma separated values kept as set locally
+	 */
+	private Set<String> sequenceProperties = new HashSet<>();
+
+	/**
+	 * Retrieves {@link #sequenceProperties}
+	 *
+	 * @return value of {@link #sequenceProperties}
+	 */
+	public String getSequenceProperties() {
+		return String.join(",", this.sequenceProperties);
+	}
+
+	/**
+	 * Sets {@link #sequenceProperties} value
+	 *
+	 * @param sequenceProperties new value of {@link #sequenceProperties}
+	 */
+	public void setSequenceProperties(String sequenceProperties) {
+		this.sequenceProperties.clear();
+		Arrays.asList(sequenceProperties.split(",")).forEach(propertyName -> {
+			this.sequenceProperties.add(propertyName.trim());
+		});
+	}
+
+	/**
 	 * List name of Outlets
-	 * */
+	 */
 	private final List<String> outletNames = new ArrayList<>();
+
+	/**
+	 * Enum of control type
+	 */
+	enum ControlType{outlet,group,sequence,unknown};
 
 	/**
 	 * Constructs a new instance of HaivisionKrakenCommunicator.
@@ -111,27 +152,58 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		this.setTrustAllCertificates(true);
 	}
 
-	public static JsonNode loadMockData(String filePath) throws IOException {
-		ObjectMapper objectMapper = new ObjectMapper();
-		return objectMapper.readTree(new File(filePath));
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
+		reentrantLock.lock();
+		try {
+			Map<String, String> stats = localExtendedStatistics.getStatistics();
+			List<AdvancedControllableProperty> advancedControllableProperties = localExtendedStatistics.getControllableProperties();
+			String controlProperty = controllableProperty.getProperty();
+			String value = String.valueOf(controllableProperty.getValue());
+			ControlType controlType = getControlType(controlProperty);
+			ControlObject controlObject = null;
+			switch (controlType){
+				case outlet:
+					controlObject = handleOutletControl(controlProperty, value);
+					break;
+				case group:
+					controlObject = handleGroupControl(controlProperty, value);
+					break;
+				case sequence:
+					int startIndex = controlProperty.indexOf("_") + 1;
+					int endIndex = controlProperty.indexOf("#");
+					String sequence = controlProperty.substring(startIndex, endIndex);
+					controlObject = new ControlObject(this.loginInfo.getToken(), "sequence", "run", null, sequence, null );
+					break;
+			}
+			if (controlObject != null){
+				sendCommandToControlDevice(controlObject);
+				updateValueForTheControllableProperty(controlProperty, value, stats, advancedControllableProperties);
+			}
+		} finally {
+			reentrantLock.unlock();
+		}
 	}
 
-//	/**
-//	 * {@inheritDoc}
-//	 */
-//	@Override
-//	protected void authenticate() throws Exception {
-//		String jsonPayload = String.format(DataprobeConstant.AUTHENTICATION_PARAM, this.getLogin(), this.getPassword());
-//		JsonNode response = this.doPost(DataprobeCommand.API_LOGIN, jsonPayload, JsonNode.class);
-//		if(response.has("success")){
-//			if (response.at("/success").asBoolean()){
-//				this.loginInfo.setToken(response.at("/token").asText());
-//			} else {
-//				loginInfo = null;
-//				throw new InvalidCredentialsException(response.at("/message").asText());
-//			}
-//		}
-//	}
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public void controlProperties(List<ControllableProperty> controllableProperties) throws Exception {
+		if (CollectionUtils.isEmpty(controllableProperties)) {
+			throw new IllegalArgumentException("ControllableProperties can not be null or empty");
+		}
+		for (ControllableProperty p : controllableProperties) {
+			try {
+				controlProperty(p);
+			} catch (Exception e) {
+				logger.error(String.format("Error when control property %s", p.getProperty()), e);
+			}
+		}
+	}
 
 	/**
 	 * {@inheritDoc}
@@ -143,16 +215,53 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			String result = this.doPost(DataprobeCommand.API_LOGIN, jsonPayload);
 			JsonNode response = objectMapper.readTree(result);
 			if (response.has("success")) {
-				if (response.at("/success").asBoolean()) {
-					this.loginInfo.setToken(response.at("/token").asText());
+				if (response.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()) {
+					String token = response.at("/token").asText();
+					if (loginInfo == null) {
+						loginInfo = new LoginInfo();
+					}
+					loginInfo.setToken(token);
 				} else {
 					loginInfo = null;
-					throw new InvalidCredentialsException(response.at("/message").asText());
+					throw new InvalidCredentialsException(response.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 				}
 			}
 		} catch (Exception e) {
 			throw new FailedLoginException("Auth error when get token api" + e);
 		}
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	public List<Statistics> getMultipleStatistics() throws Exception {
+		reentrantLock.lock();
+		try {
+			if (loginInfo == null) {
+				loginInfo = new LoginInfo();
+			}
+			checkValidApiToken();
+			Map<String, String> stats = new HashMap<>();
+			Map<String, String> dynamicStatistics = new HashMap<>();
+			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
+
+			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
+
+			if (!isEmergencyDelivery) {
+				retrieveName(stats);
+				getOutletandGroupStates(stats, advancedControllableProperties);
+
+				extendedStatistics.setStatistics(stats);
+				extendedStatistics.setDynamicStatistics(dynamicStatistics);
+				extendedStatistics.setControllableProperties(advancedControllableProperties);
+				localExtendedStatistics = extendedStatistics;
+			}
+			isEmergencyDelivery = false;
+		} finally {
+			reentrantLock.unlock();
+		}
+		return Collections.singletonList(localExtendedStatistics);
 	}
 
 	/**
@@ -185,49 +294,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 */
 	@Override
 	protected HttpHeaders putExtraRequestHeaders(HttpMethod httpMethod, String uri, HttpHeaders headers) throws Exception {
-		if (httpMethod == HttpMethod.GET || uri.contains("/html-endpoint")) {
-			headers.set("Content-Type", "text/html; charset=UTF-8");
-		} else {
-			headers.set("Content-Type", "application/json");
-		}
 		return headers;
-	}
-
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public List<Statistics> getMultipleStatistics() throws Exception {
-		reentrantLock.lock();
-		try {
-			if (loginInfo == null) {
-				loginInfo = new LoginInfo();
-			}
-			checkValidApiToken();
-			Map<String, String> stats = new HashMap<>();
-			Map<String, String> dynamicStatistics = new HashMap<>();
-			Map<String, String> controlStats = new HashMap<>();
-			ExtendedStatistics extendedStatistics = new ExtendedStatistics();
-
-			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
-
-			if (!isEmergencyDelivery) {
-//				getOutletStates(stats, controlStats, advancedControllableProperties);
-				retrieveName();
-				getOutletStates(stats,advancedControllableProperties);
-				retrieveMetadata(stats, dynamicStatistics);
-				stats.putAll(controlStats);
-				extendedStatistics.setControllableProperties(advancedControllableProperties);
-
-				extendedStatistics.setStatistics(stats);
-				extendedStatistics.setDynamicStatistics(dynamicStatistics);
-				localExtendedStatistics = extendedStatistics;
-			}
-			isEmergencyDelivery = false;
-		} finally {
-			reentrantLock.unlock();
-		}
-		return Collections.singletonList(localExtendedStatistics);
 	}
 
 	/**
@@ -245,7 +312,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 					getDefaultValueForNullData(adapterProperties.getProperty("aggregator.build.date")));
 
 			dynamicStatistics.put(DataprobeConstant.ADAPTER_RUNNER_SIZE,
-					String.valueOf(ClassLayout.parseInstance(this).toPrintable().length()/1000));
+					String.valueOf(ClassLayout.parseInstance(this).toPrintable().length() / 1000));
 
 			long adapterUptime = System.currentTimeMillis() - adapterInitializationTimestamp;
 			stats.put(DataprobeConstant.ADAPTER_UPTIME_MIN, String.valueOf(adapterUptime / (1000 * 60)));
@@ -254,78 +321,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			logger.error("Failed to populate metadata information ", e);
 		}
 	}
-
-	/**
-	 *
-	 * */
-	private void getOutletStates(Map<String, String> stats, Map<String, String> controlStats, List<AdvancedControllableProperty> advancedControllableProperties) throws Exception {
-		String[] option = {"On", "Off", "Cycle"};
-		String[] optionName = {"Sequence01", "Sequence02"};
-		String[] optionGroup = {"Run", "Stop"};
-
-		stats.put("Outlet01#Name", "VNOC-QSYS-DSP");
-		stats.put("Outlet01#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet01#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet02#Name", "Spare");
-		stats.put("Outlet02#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet02#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet03#Name", "Spare");
-		stats.put("Outlet03#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet03#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet04#Name", "Spare");
-		stats.put("Outlet04#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet04#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet05#Name", "Spare");
-		stats.put("Outlet05#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet05#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet06#Name", "Spare");
-		stats.put("Outlet06#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet06#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet07#Name", "Spare");
-		stats.put("Outlet07#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet07#OutletControl", option, "On"), "On");
-
-		stats.put("Outlet08#Name", "Spare");
-		stats.put("Outlet08#Status", "On");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Outlet08#OutletControl", option, "On"), "On");
-
-		stats.put("Group01#Name", "Group 1");
-		stats.put("Group01#Status", "Run");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Group01#OutletControl", optionGroup, "Run"), "Run");
-
-		stats.put("Group02#Name", "Group 2");
-		stats.put("Group02#Status", "Run");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Group02#OutletControl", optionGroup, "Run"), "Run");
-
-		stats.put("Group03#Name", "Group 3");
-		stats.put("Group03#Status", "Run");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Group03#OutletControl", optionGroup, "Run"), "Run");
-
-		stats.put("Group04#Name", "Group 4");
-		stats.put("Group04#Status", "Run");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Group04#OutletControl", optionGroup, "Run"), "Run");
-
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createDropdown("Sequence#Name", optionName, "Sequence01"), "Sequence01");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createButton("Sequence#Control", "Run", "Running"), "None");
-		addAdvancedControlProperties(advancedControllableProperties, controlStats, createButton("Sequence#Control", "Stop", "Stopping"), "None");
-
-		stats.put("Line1#Voltage(V)", "258.9");
-		stats.put("Line1#Current(mA)", "0.3");
-
-		stats.put("Line2#Voltage(V)", "999.9");
-		stats.put("Line2#Current(mA)", "999.9");
-
-		stats.put("Temperature#T1(C)", "20");
-		stats.put("Temperature#T2(C)", "25");
-	}
-
-
 
 	/**
 	 * Check API token validation
@@ -340,81 +335,137 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		}
 	}
 
-	private void retrieveName() throws Exception{
-//		JsonNode namesResponse = loadMockData("src/main/java/com/insightsystems/symphony/dal/dataprobe/common/mockdata/mockdata.json");
+	/**
+	 * Retrieves and processes device names and analog data from a remote API response.
+	 *
+	 * @param stats a {@code Map<String, String>} where processed analog key-value pairs will be stored
+	 * @throws Exception if the response is invalid, missing required fields, or cannot be parsed
+	 */
+	private void retrieveName(Map<String, String> stats) throws Exception {
 		String jsonPayload = String.format(DataprobeConstant.RETRIEVE_NAME, this.loginInfo.getToken());
 		String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload);
 		JsonNode namesResponse = objectMapper.readTree(result);
-		if (namesResponse.has("names")){
+		if (namesResponse.has("names") || namesResponse.has("analog")) {
 			JsonNode namesJson = namesResponse.at("/names");
-			if (namesJson.has("outletNames") && namesJson.has("groupNames")){
+			JsonNode analogJson = namesResponse.at("/analog");
+
+			if (analogJson != null && analogJson.isObject()) {
+				analogJson.fieldNames().forEachRemaining(key -> {
+					String value = analogJson.get(key).asText();
+					String unit = getUnitForKey(key);
+					stats.put(key + unit, value);
+				});
+			}
+
+			if (namesJson.has("groupNames")) {
 				JsonNode groups = namesJson.at("/groupNames");
 				groupNames.clear();
 				for (Iterator<String> it = groups.fieldNames(); it.hasNext(); ) {
 					String key = it.next();
-					groupNames.add(groups.at("/"+key).asText());
+					groupNames.add(groups.at("/" + key).asText());
 				}
+			} else {
+				throw new Exception("Unable to parse names from response. 'groupNames' fields missing.");
+			}
 
+			if(namesJson.has("outletNames")){
 				JsonNode outlets = namesJson.at("/outletNames");
 				outletNames.clear();
 				for (Iterator<String> it = outlets.fieldNames(); it.hasNext(); ) {
 					String key = it.next();
-					outletNames.add(outlets.at("/"+key).asText());
+					String name = outlets.get(key).asText();
+					outletNames.add(key + " " + name);
 				}
-			} else{
-				throw new Exception("Unable to parse names from response. 'outletNames' or 'groupNames' fields missing.");
+			} else {
+				throw new Exception("Unable to parse names from response. 'outletNames' fields missing.");
 			}
 		} else {
 			throw new Exception("Unable to parse names from response. 'names' field missing in response.");
 		}
 	}
 
-	private void getOutletStates(Map<String, String> stats, List<AdvancedControllableProperty> controls) throws Exception {
-//		JsonNode stateResponse = loadMockData("src/main/java/com/insightsystems/symphony/dal/dataprobe/common/mockdata/mockupstatus.json");
-		String result = this.doPost("/services/retrieve/", createJsonRetrieveString());
+	/**
+	 * Retrieves and processes the states of outlets and groups from a remote API response.
+	 *
+	 * @param stats a {@code Map<String, String>} where the states of outlets, groups, and sequences will be stored
+	 * @param controls a {@code List<AdvancedControllableProperty>} where controls for outlets, groups, and sequences will be added
+	 * @throws Exception if the response contains errors, required fields are missing, or parsing fails
+	 */
+	private void getOutletandGroupStates(Map<String, String> stats, List<AdvancedControllableProperty> controls) throws Exception {
+		String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, createJsonRetrieveString());
 		JsonNode stateResponse = objectMapper.readTree(result);
 		checkForErrors(stateResponse);
-		if (stateResponse.has("outlets")){
-			JsonNode outletStates = stateResponse.at("/outlets");
+
+		/* Outlet */
+		if (stateResponse.has("outlets")) {
+			JsonNode outletStates = stateResponse.at(DataprobeConstant.RESPONSE_OUTLETS);
 			int outletNumber = 1;
 			for (Iterator<String> it = outletStates.fieldNames(); it.hasNext(); ) {
 				String fieldName = it.next();
-				createOutletStats(outletNumber,fieldName,outletStates.at("/"+fieldName).asText(),stats,controls);
+				createOutletStats(outletNumber, fieldName, outletStates.at("/" + fieldName).asText(), stats, controls);
 				outletNumber++;
 			}
-		} else{
+		} else {
 			throw new Exception("Unable to parse outlet states. 'outlets' field not found.");
 		}
 
-		if (stateResponse.has("groups")){
-			JsonNode groupStates = stateResponse.at("/groups");
+		/* Group */
+		if (stateResponse.has("groups")) {
+			JsonNode groupStates = stateResponse.at(DataprobeConstant.RESPONSE_GROUPS);
 			for (Iterator<String> it = groupStates.fieldNames(); it.hasNext(); ) {
 				String fieldName = it.next();
-				createGroupStats(fieldName,groupStates.at("/"+fieldName).asText(),stats,controls);
+				createGroupStats(fieldName, groupStates.at("/" + fieldName).asText(), stats, controls);
 			}
-		} else{
-			throw new Exception("Unable to parse outlet states. 'outlets' field not found.");
+		} else {
+			throw new Exception("Unable to parse group states. 'groups' field not found.");
 		}
-	}
 
-	private void createOutletStats(int number,String name, String state, Map<String, String> stats, List<AdvancedControllableProperty> controls) {
-		String[] possibleValues = EnumTypeHandler.getEnumNames(OutletsOptionEnum.class);
-		for (Outlet item : Outlet.values()){
-			String propertyName = uppercaseFirstCharacter(name) + DataprobeConstant.HASH + item.getPropertyName();
-			switch (item){
+		/* Sequence */
+		if(!sequenceProperties.isEmpty()){
+				for (String sequenceName : sequenceProperties) {
+					for (Sequence item : Sequence.values()){
+						String sequence = formatSequenceName(sequenceName) + DataprobeConstant.HASH + item.getPropertyName();
+						switch (item){
+							case NAME:
+								stats.put(sequence, sequenceName);
+								break;
+							case CONTROL:
+								addAdvancedControlProperties(controls, stats, createButton(sequence, "Run", "Running", 5), DataprobeConstant.NONE);
+								break;
+							default:
+								break;
+						}
+					}
+				}
+			}
+		}
+
+	/**
+	 * Creates and updates the statistics and controls for a specific outlet based on its properties.
+	 *
+	 * @param number the outlet number used to format the property name
+	 * @param name the raw name of the outlet, used to extract the formatted outlet name
+	 * @param state the current state of the outlet (e.g., "On", "Off")
+	 * @param stats a {@code Map<String, String>} where outlet-specific stats will be stored
+	 * @param controls a {@code List<AdvancedControllableProperty>} where controls for the outlet will be added
+	 */
+	private void createOutletStats(int number, String name, String state, Map<String, String> stats, List<AdvancedControllableProperty> controls) {
+		for (Outlet item : Outlet.values()) {
+			String propertyName = formatOutletName(number) + DataprobeConstant.HASH + item.getPropertyName();
+			switch (item) {
 				case NAME:
-					stats.put(propertyName, name);
-					break;
-				case STATUS:
-					stats.put(propertyName, state);
-					controls.add(createDropdown(propertyName, possibleValues, state));
+					String result = name.substring(name.indexOf(" ") + 1);
+					stats.put(propertyName, result);
 					break;
 				case OUTLET_CONTROL:
-					if (Arrays.asList(possibleValues).contains(state)) {
-						addAdvancedControlProperties(controls, stats, createDropdown(propertyName, possibleValues, state), state);
-					} else {
-						stats.put(propertyName, DataprobeConstant.NONE);
-					}
+					int status = DataprobeConstant.ON.equalsIgnoreCase(state) ? 1 : 0;
+					addAdvancedControlProperties(controls, stats,
+							createSwitch(propertyName, status, DataprobeConstant.OFF, DataprobeConstant.ON),
+							String.valueOf(status));
+					stats.put(propertyName, state);
+					break;
+				case CYCLE:
+					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 5), DataprobeConstant.NONE);
 					break;
 				default:
 					stats.put(propertyName, state);
@@ -423,52 +474,76 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		}
 	}
 
-	private void createGroupStats(String name,String state,Map<String,String> stats, List<AdvancedControllableProperty> controls){
-		String[] possibleValues = EnumTypeHandler.getEnumNames(GroupsOptionEnum.class);
-	for (Group item : Group.values()){
-		String propertyName = uppercaseFirstCharacter(name) + DataprobeConstant.HASH + item.getPropertyName();
-		switch (item){
-			case NAME:
-				stats.put(propertyName, name);
-				break;
-			case STATUS:
-				if ("?".equals(state)) {
-					stats.put(propertyName, "No outlets in group");
-				} else {
-					stats.put(propertyName, state);
-					controls.add(createDropdown(propertyName, possibleValues, state));
-				}
+	/**
+	 * Creates and updates the statistics and controls for a specific group based on its properties.
+	 *
+	 * @param name the raw name of the group, used to extract the formatted group name
+	 * @param state the current state of the group (e.g., "On", "Off")
+	 * @param stats a {@code Map<String, String>} where group-specific stats will be stored
+	 * @param controls a {@code List<AdvancedControllableProperty>} where controls for the group will be added
+	 */
+	private void createGroupStats(String name, String state, Map<String, String> stats, List<AdvancedControllableProperty> controls) {
+		for (Group item : Group.values()) {
+			String propertyName = formatGroupName(name) + DataprobeConstant.HASH + item.getPropertyName();
+			switch (item) {
+				case NAME:
+					stats.put(propertyName, name);
 					break;
-			case OUTLET_CONTROL:
+				case STATUS:
+					if ("?".equals(state)) {
+						stats.put(propertyName, "No outlets in group");
+					} else {
+						stats.put(propertyName, state);
+					}
+					break;
+				case OUTLET_CONTROL:
+					int status = DataprobeConstant.ON.equalsIgnoreCase(state) ? 1 : 0;
+					addAdvancedControlProperties(controls, stats, createSwitch(propertyName, status, DataprobeConstant.OFF, DataprobeConstant.ON), String.valueOf(status));
 					stats.put(propertyName, state);
-					addAdvancedControlProperties(controls, stats, createDropdown(propertyName, possibleValues, state), state);
-					stats.put(uppercaseFirstCharacter(name) + DataprobeConstant.HASH + Group.STATUS.getPropertyName(), state);
-				break;
-			default:
-				stats.put(propertyName, state);
-				break;
+					break;
+				case CYCLE:
+					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 5), DataprobeConstant.NONE);
+					break;
+				default:
+					stats.put(propertyName, state);
+					break;
+			}
 		}
-	}
 	}
 
 	/**
-	 * Create dropdown advanced controllable property
-	 *
-	 * @param name the name of the control
-	 * @param initialValue initial value of the control
-	 * @return AdvancedControllableProperty dropdown instance
+	 * Creates a JSON string representation of the state request object.
+	 * @return a JSON string representing the state request, which includes the token, outlet names, and group names
+	 * @throws JsonProcessingException if an error occurs during JSON serialization
 	 */
-	private AdvancedControllableProperty createDropdown(String name, String[] values, String initialValue) {
-		DropDown dropDown = new DropDown();
-		dropDown.setOptions(values);
-		dropDown.setLabels(values);
-
-		return new AdvancedControllableProperty(name, new Date(), dropDown, initialValue);
+	private String createJsonRetrieveString() throws JsonProcessingException {
+		Serialisers.StateRequestObject stateRequestObject = new Serialisers.StateRequestObject(
+				this.loginInfo.getToken(),
+				outletNames.toArray(new String[0]),
+				groupNames.toArray(new String[0])
+		);
+		return objectMapper.writeValueAsString(stateRequestObject);
 	}
 
-	private String createJsonRetrieveString() throws JsonProcessingException {
-		Serialisers.StateRequestObject stateRequestObject = new Serialisers.StateRequestObject(this.loginInfo.getToken(),outletNames.toArray(new String[0]),groupNames.toArray(new String[0]));
-		return objectMapper.writeValueAsString(stateRequestObject);
+	/**
+	 * Create switch is control property for metric
+	 *
+	 * @param name the name of property
+	 * @param status initial status (0|1)
+	 * @return AdvancedControllableProperty switch instance
+	 */
+	private AdvancedControllableProperty createSwitch(String name, int status, String labelOff, String labelOn) {
+		AdvancedControllableProperty.Switch toggle = new AdvancedControllableProperty.Switch();
+		toggle.setLabelOff(labelOff);
+		toggle.setLabelOn(labelOn);
+
+		AdvancedControllableProperty advancedControllableProperty = new AdvancedControllableProperty();
+		advancedControllableProperty.setName(name);
+		advancedControllableProperty.setValue(status);
+		advancedControllableProperty.setType(toggle);
+		advancedControllableProperty.setTimestamp(new Date());
+
+		return advancedControllableProperty;
 	}
 
 	/**
@@ -477,13 +552,15 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 * @param name name of the button
 	 * @param label label of the button
 	 * @param labelPressed label of the button after pressing it
+	 * @param gracePeriod grace period of button
 	 * @return This returns the instance of {@link AdvancedControllableProperty} type Button.
 	 */
-	private AdvancedControllableProperty createButton(String name, String label, String labelPressed) {
+	private AdvancedControllableProperty createButton(String name, String label, String labelPressed, long gracePeriod) {
 		AdvancedControllableProperty.Button button = new AdvancedControllableProperty.Button();
 		button.setLabel(label);
 		button.setLabelPressed(labelPressed);
-		return new AdvancedControllableProperty(name, new Date(), button, "");
+		button.setGracePeriod(gracePeriod);
+		return new AdvancedControllableProperty(name, new Date(), button, DataprobeConstant.EMPTY);
 	}
 
 	/**
@@ -498,17 +575,22 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		if (property != null) {
 			advancedControllableProperties.removeIf(controllableProperty -> controllableProperty.getName().equals(property.getName()));
 
-			String propertyValue = StringUtils.isNotNullOrEmpty(value) ? value : "";
+			String propertyValue = StringUtils.isNotNullOrEmpty(value) ? value : DataprobeConstant.EMPTY;
 			stats.put(property.getName(), propertyValue);
-
 			advancedControllableProperties.add(property);
 		}
 	}
 
+	/**
+	 * Checks the device response for errors and throws an exception if any error is detected.
+	 * @param deviceResponse the JSON response from the device to be checked for errors
+	 * @throws ResourceNotReachableException if the response indicates failure and the error message is unexpected
+	 * @throws Exception if an unexpected error occurs during error checking
+	 */
 	private void checkForErrors(JsonNode deviceResponse) throws Exception {
-		if (!deviceResponse.at("/success").asBoolean()) {
-			if (!deviceResponse.at("/message").asText().contains("There are no Groups")){
-				throw new Exception(deviceResponse.at("/message").asText());
+		if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()) {
+			if (!deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no Groups")) {
+				throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 			}
 		}
 	}
@@ -524,6 +606,22 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
+	 * Determines the unit to be appended to a given key based on specific patterns.
+	 * @param key the key to analyze for unit assignment
+	 * @return a string representing the unit (e.g., "(mA)", "(V)", "(C)") or an empty string if no unit matches
+	 */
+	private String getUnitForKey(String key) {
+		if (key.contains(DataprobeConstant.CURRENT)) {
+			return "(mA)";
+		} else if (key.contains(DataprobeConstant.VOLTAGE)) {
+			return "(V)";
+		} else if (key.contains(DataprobeConstant.T0) || key.contains(DataprobeConstant.T1)) {
+			return "(C)";
+		}
+		return "";
+	}
+
+	/**
 	 * capitalize the first character of the string
 	 *
 	 * @param input input string
@@ -534,57 +632,123 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		return Character.toUpperCase(firstChar) + input.substring(1);
 	}
 
-	private String formatOutletName(int number,String name) {return "Outlet" + number + ": " + name;}
-	private String formatGroupName(String groupName) {return "Groups#" + groupName;}
-
 	/**
-	 * {@inheritDoc}
+	 * Handles the group control operation based on the given control property and value.
+	 * @param controlProperty the control property string, containing the group information and action
+	 * @param value the control value indicating the desired state (e.g., "1" for on, "0" for off)
+	 * @return a {@link ControlObject} representing the group control operation to be executed
 	 */
-	@Override
-	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
-		reentrantLock.lock();
-		try {
-			String controlProperty = controllableProperty.getProperty();
-			System.out.println("controlProperty: " + controlProperty);
-			String deviceId = controllableProperty.getDeviceId();
-			String value = String.valueOf(controllableProperty.getValue());
-			ControlObject controlObject = null;
+	private ControlObject handleGroupControl(String controlProperty, String value) {
+		int startIndex = controlProperty.indexOf("_") + 1;
+		int endIndex = controlProperty.indexOf("#");
+		String group = controlProperty.substring(startIndex, endIndex);
+		boolean state = value.equals("1");
 
-
-			if (controlObject != null){
-				handleControl(controlObject);
-			}
-
-		} finally {
-			reentrantLock.unlock();
+		if (controlProperty.contains(DataprobeConstant.CYCLE)) {
+				return new ControlObject(this.loginInfo.getToken(), "group", "cycle", null, null, group);
 		}
+		return new ControlObject(this.loginInfo.getToken(),"group",state ? "on":"off",null,null, group);
 	}
 
-	private void handleControl(ControlObject controlObject){
-		try {
+	/**
+	 * Handles the outlet control operation based on the given control property and value.
+	 * @param controlProperty the control property string, containing the outlet information and action
+	 * @param value the control value indicating the desired state (e.g., "1" for on, "0" for off)
+	 * @return a {@link ControlObject} representing the outlet control operation to be executed
+	 */
+	private ControlObject handleOutletControl(String controlProperty, String value) {
+		int startIndex = controlProperty.indexOf("_") + 1;
+		int endIndex = controlProperty.indexOf(" ");
+		String outlet = controlProperty.substring(startIndex, endIndex);
+
+		if (controlProperty.contains(DataprobeConstant.CYCLE)) {
+			return new ControlObject(this.loginInfo.getToken(), "outlet", "cycle", new String[]{outlet}, null, null);
+		}
+		boolean state = value.equals("1");
+		return new ControlObject(this.loginInfo.getToken(), "outlet", state ? "on" : "off", new String[]{outlet}, null, null
+		);
+	}
+
+	/**
+	 * Sends a command to control a device and processes the response.
+	 * @param controlObject the {@link ControlObject} that represents the command to control the device
+	 * @throws ResourceNotReachableException if there is an error in communication with the device or if the device fails to process the command
+	 */
+	private void sendCommandToControlDevice(ControlObject controlObject) {
+		try{
 			String controlResponse = this.doPost(DataprobeCommand.CONTROL,objectMapper.writeValueAsString(controlObject));
-			checkForErrors(objectMapper.readTree(controlResponse));
-		} catch (Exception e ){
-			throw new ResourceNotReachableException("", e);
+			JsonNode deviceResponse = objectMapper.readTree(controlResponse);
+			if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()) {
+				if (!deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no data")) {
+					throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
+				}
+			}
+		} catch (Exception e) {
+			throw new ResourceNotReachableException("Can not control device %s", e);
 		}
 	}
 
-
 	/**
-	 * {@inheritDoc}
+	 * Update the value for the control metric
+	 *
+	 * @param property is name of the metric
+	 * @param value the value is value of properties
+	 * @param extendedStatistics list statistics property
+	 * @param advancedControllableProperties the advancedControllableProperties is list AdvancedControllableProperties
 	 */
-	@Override
-	public void controlProperties(List<ControllableProperty> controllableProperties) throws Exception {
-		if (CollectionUtils.isEmpty(controllableProperties)) {
-			throw new IllegalArgumentException("ControllableProperties can not be null or empty");
-		}
-		for (ControllableProperty p : controllableProperties) {
-			try {
-				controlProperty(p);
-			} catch (Exception e) {
-				logger.error(String.format("Error when control property %s", p.getProperty()), e);
+	private void updateValueForTheControllableProperty(String property, String value, Map<String, String> extendedStatistics, List<AdvancedControllableProperty> advancedControllableProperties) {
+		for (AdvancedControllableProperty advancedControllableProperty : advancedControllableProperties) {
+			if (advancedControllableProperty.getName().equals(property)) {
+				extendedStatistics.put(property, value);
+				advancedControllableProperty.setValue(value);
+				break;
 			}
 		}
+	}
+
+	/**
+	 * Determines the type of control based on the provided control property string.
+	 * @param controlProperty the control property string to be evaluated
+	 * @return the {@link ControlType} corresponding to the control property
+	 */
+	private ControlType getControlType(String controlProperty) {
+		if (controlProperty.startsWith(DataprobeConstant.OUTLET))
+			return ControlType.outlet;
+
+		if (controlProperty.startsWith(DataprobeConstant.GROUP))
+			return ControlType.group;
+
+		if (controlProperty.startsWith(DataprobeConstant.SEQUENCE))
+			return ControlType.sequence;
+
+		return ControlType.unknown;
+	}
+
+	/**
+	 * Formats the outlet name by appending a number to the outlet constant.
+	 * @param number the number to be appended to the outlet constant
+	 * @return the formatted outlet name as a string, e.g., "OUTLET1" if number is 1
+	 */
+	private String formatOutletName(int number) {
+		return DataprobeConstant.OUTLET + number ;
+	}
+
+	/**
+	 * Formats the group name.
+	 * @param groupName the number to be appended to the group constant
+	 * @return the formatted group name as a string
+	 */
+	private String formatGroupName(String groupName) {
+		return DataprobeConstant.GROUP + groupName;
+	}
+
+	/**
+	 * Formats the sequence.
+	 * @param sequenceName the sequence to be typed by user
+	 * @return the formatted sequence as a string
+	 */
+	private String formatSequenceName(String sequenceName) {
+		return DataprobeConstant.SEQUENCE + sequenceName;
 	}
 
 	/**
@@ -603,7 +767,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		long minutes = uptimeSeconds % 3600 / 60;
 		long hours = uptimeSeconds % 86400 / 3600;
 		long days = uptimeSeconds / 86400;
-
 		if (days > 0) {
 			normalizedUptime.append(days).append(" day(s) ");
 		}

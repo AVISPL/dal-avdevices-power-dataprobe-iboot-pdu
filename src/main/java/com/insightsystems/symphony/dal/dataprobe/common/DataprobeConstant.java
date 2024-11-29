@@ -1,3 +1,7 @@
+/*
+ *  Copyright (c) 2024 AVI-SPL, Inc. All Rights Reserved.
+ */
+
 package com.insightsystems.symphony.dal.dataprobe.common;
 
 /**
@@ -9,15 +13,32 @@ package com.insightsystems.symphony.dal.dataprobe.common;
  */
 public class DataprobeConstant {
 	public static final String AUTHENTICATION_PARAM = "{\"username\":\"%s\", \"password\":\"%s\"}";
-	public static final String RETRIEVE_NAME = "{\"token\":\"%s\", \"names\":[\"outlets\",\"groups\",\"sequences\"]}";
-	public static final String GROUPS = "Groups#";
-	public static final String TOKEN_EXPIRED = "Token expired";
+	public static final String RETRIEVE_NAME = "{\"token\":\"%s\", \"names\":[\"outlets\",\"groups\",\"sequences\"], \"analog\":[\"LC1\",\"LC2\",\"LV1\",\"LV2\",\"T0\",\"T1\"]}";
+	public static final String GROUP = "Group_";
+	public static final String OUTLET = "Outlet_";
+	public static final String SEQUENCE = "Sequence_";
 	public static final String NONE = "None";
-	public static final String NAME = "Name";
-	public static final String OUTLET_CONTROL = "OutletControl";
-	public static final String STATUS = "Status";
+	public static final String EMPTY = "";
 	public static final String HASH = "#";
 	public static final String INVALID_TOKEN = "invalid token";
+
+	/* Response properties */
+	public static final String RESPONSE_SUCCESS = "/success";
+	public static final String RESPONSE_MESSAGE = "/message";
+	public static final String RESPONSE_OUTLETS = "/outlets";
+	public static final String RESPONSE_GROUPS = "/groups";
+
+	/* Analog properties */
+	public static final String VOLTAGE = "Voltage";
+	public static final String CURRENT = "Current";
+	public static final String T0 = "T0";
+	public static final String T1 = "T1";
+	public static final String ON = "On";
+	public static final String OFF = "Off";
+
+	/* Button */
+	public static final String CYCLE = "Cycle";
+	public static final String CYCLING = "Cycling";
 
 	public static final String MONITORED_DEVICES_TOTAL = "MonitoredDevicesTotal";
 	public static final String MONITORING_CYCLE_DURATION = "LastMonitoringCycleDuration(s)";

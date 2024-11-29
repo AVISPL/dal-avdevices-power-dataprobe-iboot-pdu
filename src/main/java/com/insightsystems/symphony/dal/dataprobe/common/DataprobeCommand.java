@@ -1,3 +1,7 @@
+/*
+ *  Copyright (c) 2024 AVI-SPL, Inc. All Rights Reserved.
+ */
+
 package com.insightsystems.symphony.dal.dataprobe.common;
 
 /**

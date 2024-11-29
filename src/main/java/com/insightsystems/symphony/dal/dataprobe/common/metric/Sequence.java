@@ -8,17 +8,16 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * Enum representing different types of Outlet settings
+ * Enum representing different types of Sequence settings
  *
  * @author Harry / Symphony Dev Team<br>
  * Created on 11/26/2024
  * @since 1.0.0
  */
-public enum Outlet {
-	NAME("Name", "Outlets#","outletNames"),
-	OUTLET_CONTROL("Control","Outlets#", "outletControl"),
-	STATUS("Status","Outlets#", "outlet"),
-	CYCLE("Cycle","Outlets#", "cycle"),
+
+public enum Sequence {
+	NAME("Name", "Sequence#","name"),
+	CONTROL("Control","Sequence#", "control"),
 	;
 
 	private final String propertyName;
@@ -26,12 +25,12 @@ public enum Outlet {
 	private final String value;
 
 	/**
-	 * Constructor for Outlet.
+	 * Constructor for Sequence.
 	 *
-	 * @param defaultName The name of the Outlet property.
-	 * @param value The corresponding value in the Outlet response.
+	 * @param defaultName The name of the sequence property.
+	 * @param value The corresponding value in the sequence response.
 	 */
-	Outlet(String defaultName, String group, String value) {
+	Sequence(String defaultName, String group, String value) {
 		this.propertyName = defaultName;
 		this.group = group;
 		this.value = value;
@@ -65,13 +64,14 @@ public enum Outlet {
 	}
 
 	/**
-	 * Retrieves the Outlet enum based on its default name.
+	 * Retrieves the Sequence enum based on its default name.
 	 *
-	 * @param name The default name of the Outlet enum.
-	 * @return The Outlet enum corresponding to the default name, or null if not found.
+	 * @param name The default name of the Sequence enum.
+	 * @return The Sequence enum corresponding to the default name, or null if not found.
 	 */
-	public static Outlet getByDefaultName(String name) {
-		Optional<Outlet> property = Arrays.stream(values()).filter(item -> item.getPropertyName().equalsIgnoreCase(name)).findFirst();
+	public static Sequence getByDefaultName(String name) {
+		Optional<Sequence> property = Arrays.stream(values()).filter(item -> item.getPropertyName().equalsIgnoreCase(name)).findFirst();
 		return property.orElse(null);
 	}
 }
+

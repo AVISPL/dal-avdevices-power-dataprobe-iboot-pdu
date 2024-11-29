@@ -1,3 +1,7 @@
+/*
+ *  Copyright (c) 2024 AVI-SPL, Inc. All Rights Reserved.
+ */
+
 package com.insightsystems.symphony.dal.dataprobe.common.metric;
 
 import java.util.Arrays;
@@ -13,8 +17,9 @@ import java.util.Optional;
 
 public enum Group {
 	NAME("Name", "Groups#","groupNames"),
-	OUTLET_CONTROL("OutletControl","Groups#", "outletControl"),
+	OUTLET_CONTROL("Control","Groups#", "outletControl"),
 	STATUS("Status","Groups#", "groups"),
+	CYCLE("Cycle","Groups#", "cycle"),
 	;
 
 	private final String propertyName;
