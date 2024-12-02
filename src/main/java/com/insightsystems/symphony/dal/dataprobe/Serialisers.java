@@ -5,6 +5,7 @@
 package com.insightsystems.symphony.dal.dataprobe;
 
 /**
+ * This class contains helper classes for serializing data related to control and state requests.
  * @author Harry / Symphony Dev Team<br>
  * Created on 11/22/2024
  * @since 1.0.0
