@@ -29,6 +29,7 @@ public enum Outlet {
 	 * Constructor for Outlet.
 	 *
 	 * @param defaultName The name of the Outlet property.
+	 * @param group The group of the Outlet property.
 	 * @param value The corresponding value in the Outlet response.
 	 */
 	Outlet(String defaultName, String group, String value) {

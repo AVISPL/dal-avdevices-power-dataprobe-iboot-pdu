@@ -28,6 +28,7 @@ public enum Sequence {
 	 * Constructor for Sequence.
 	 *
 	 * @param defaultName The name of the sequence property.
+	 * @param group The group of the Outlet property.
 	 * @param value The corresponding value in the sequence response.
 	 */
 	Sequence(String defaultName, String group, String value) {

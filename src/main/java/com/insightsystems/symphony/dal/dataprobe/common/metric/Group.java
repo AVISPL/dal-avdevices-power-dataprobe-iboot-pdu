@@ -30,6 +30,7 @@ public enum Group {
 	 * Constructor for Group.
 	 *
 	 * @param defaultName The name of the group property.
+	 * @param group The group of the Outlet property.
 	 * @param value The corresponding value in the group response.
 	 */
 	Group(String defaultName, String group, String value) {

@@ -5,9 +5,9 @@
 package com.insightsystems.symphony.dal.dataprobe;
 
 /**
- * This class contains helper classes for serializing data related to control and state requests.
- * It includes the {@link ControlObject} for controlling devices and the {@link StateRequestObject}
- * for managing outlet and group states.
+ * @author Harry / Symphony Dev Team<br>
+ * Created on 11/22/2024
+ * @since 1.0.0
  */
 public class Serialisers {
 
