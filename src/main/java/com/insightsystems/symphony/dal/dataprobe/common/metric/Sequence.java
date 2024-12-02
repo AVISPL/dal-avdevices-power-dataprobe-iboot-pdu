@@ -18,7 +18,7 @@ import java.util.Optional;
 public enum Sequence {
 	NAME("Name", "Sequence#","name"),
 	CONTROL("Control","Sequence#", "control"),
-	;
+	STOP("Stop","Sequence#", "stop");
 
 	private final String propertyName;
 	private final String group;
