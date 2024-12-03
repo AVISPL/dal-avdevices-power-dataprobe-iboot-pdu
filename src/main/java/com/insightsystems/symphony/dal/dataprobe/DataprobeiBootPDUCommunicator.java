@@ -13,14 +13,13 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
 
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.util.CollectionUtils;
 
 
@@ -53,19 +52,19 @@ import com.avispl.symphony.dal.util.StringUtils;
  * Supported features are:
  * <p>
  * Monitoring:
- * <li>Outlet 1-N </li>
+ * <li>Outlet 1-N</li>
  * <li>Name</li>
  * <li>Status</li>
  * <li>Control</li>
  * <li>Cycle</li>
  *
- * <li>Group 1-N </li>
+ * <li>Group 1-N</li>
  * <li>Name</li>
  * <li>Status</li>
  * <li>Control</li>
  * <li>Cycle</li>
  *
- * <li>Sequence_name </li>
+ * <li>Sequence_name</li>
  * <li>Name</li>
  * <li>Control</li>
  * <p>
@@ -94,11 +93,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private Properties adapterProperties;
 
 	/**
-	 * Device adapter instantiation timestamp.
-	 */
-	private long adapterInitializationTimestamp;
-
-	/**
 	 * isEmergencyDelivery to check if control flow is trigger
 	 */
 	private boolean isEmergencyDelivery;
@@ -123,7 +117,27 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	/**
 	 * List name of Groups
 	 */
-	private final List<String> groupNames = new ArrayList<>();
+	private final Map<String, String> groupNames = new HashMap<>();
+
+	/**
+	 * List name of Outlets
+	 */
+	private final Map<String, String> outletNames = new HashMap<>();
+
+	/**
+	 * List state of Outlets
+	 */
+	private final Map<String, String> outletStates = new HashMap<>();
+
+	/**
+	 * List state of Group
+	 */
+	private final Map<String, String> groupStates = new HashMap<>();
+
+	/**
+	 * List name of analog
+	 */
+	private final Map<String, String> analogProperty = new HashMap<>();
 
 	/**
 	 * Configurable property for historical properties, comma separated values kept as set locally
@@ -182,12 +196,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
-	 * List name of Outlets
-	 */
-	private final List<String> outletNames = new ArrayList<>();
-
-	/**
-	 * Constructs a new instance of HaivisionKrakenCommunicator.
+	 * Constructs a new instance of DataprobeiBootPDUCommunicator.
 	 */
 	public DataprobeiBootPDUCommunicator() throws IOException {
 		adapterProperties = new Properties();
@@ -209,7 +218,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			List<AdvancedControllableProperty> advancedControllableProperties = localExtendedStatistics.getControllableProperties();
 			String controlProperty = controllableProperty.getProperty();
 			String value = String.valueOf(controllableProperty.getValue());
-			DataprobeControlType controlType = DataprobeControlType.getByDefaultName(controlProperty);
+			DataprobeControlType controlType = getByDefaultName(controlProperty);
 			ControlObject controlObject = null;
 			switch (controlType) {
 				case OUTLET:
@@ -249,6 +258,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
+	 * Authenticates the user by sending a login request and retrieves the token.
+	 *
+	 * @throws Exception if an error occurs during the login process.
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -291,8 +303,13 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 
 			if (!isEmergencyDelivery) {
-				retrieveName(dynamicStatistics);
-				retrieveStatesByName(stats, advancedControllableProperties);
+				retrieveMonitoringData();
+				retrieveControllingState();
+
+				populateOutletName(stats, advancedControllableProperties);
+				populateGroupName(stats, advancedControllableProperties);
+				populateSequenceStates(stats, advancedControllableProperties);
+				populateAnalogData(stats, dynamicStatistics);
 
 				extendedStatistics.setStatistics(stats);
 				extendedStatistics.setDynamicStatistics(dynamicStatistics);
@@ -307,6 +324,52 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
+	 * Populate group name
+	 *
+	 * @param stats to store group name
+	 * @param advancedControllableProperties to handle control for group name
+	 */
+	private void populateGroupName(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
+		for (Entry<String, String> item : groupNames.entrySet()) {
+			String value = item.getValue();
+			createGroupStats(value, groupStates.get(value), stats, advancedControllableProperties);
+		}
+	}
+
+	/**
+	 * Populate outlet name
+	 *
+	 * @param stats to store outlet name
+	 * @param advancedControllableProperties to handle control for outlet name
+	 */
+	private void populateOutletName(Map<String, String> stats, List<AdvancedControllableProperty> advancedControllableProperties) {
+		for (Entry<String, String> item : outletNames.entrySet()) {
+			String key = item.getKey();
+			String value = item.getValue();
+			createOutletStats(Integer.parseInt(key), value, outletStates.get(key), stats, advancedControllableProperties);
+		}
+	}
+
+	/**
+	 * Populate analog data
+	 *
+	 * @param dynamicStatistics store analog to db
+	 */
+	private void populateAnalogData(Map<String, String> stats, Map<String, String> dynamicStatistics) {
+		for (Entry<String, String> item : analogProperty.entrySet()) {
+			String key = item.getKey();
+			String unit = getUnitForKey(key);
+			String value = item.getValue();
+			boolean isHistorical = historicalProperties.contains(key);
+			if (isHistorical) {
+				dynamicStatistics.put(key + unit, value);
+				continue;
+			}
+			stats.put(key + unit, value);
+		}
+	}
+
+	/**
 	 * {@inheritDoc}
 	 */
 	@Override
@@ -314,7 +377,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		if (logger.isDebugEnabled()) {
 			logger.debug("Internal init is called.");
 		}
-		adapterInitializationTimestamp = System.currentTimeMillis();
 		super.internalInit();
 	}
 
@@ -332,14 +394,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	protected HttpHeaders putExtraRequestHeaders(HttpMethod httpMethod, String uri, HttpHeaders headers) throws Exception {
-		return headers;
-	}
-
-	/**
 	 * Check API token validation
 	 * If the token expires, we send a request to get a new token
 	 */
@@ -354,36 +408,21 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Retrieves and processes device names and analog data from a remote API response.
-	 *
-	 * @param dynamicStatistics a {@code Map<String, String>} where processed analog key-value pairs will be stored
-	 * @throws Exception if the response is invalid, missing required fields, or cannot be parsed
 	 */
-	private void retrieveName(Map<String, String> dynamicStatistics) throws Exception {
-		String jsonPayload = String.format(DataprobeConstant.RETRIEVE_NAME, this.loginInfo.getToken());
-		String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload);
-		JsonNode namesResponse = parseJson(result);
+	private void retrieveMonitoringData() {
+		try {
+			String jsonPayload = String.format(DataprobeConstant.RETRIEVE_NAME, this.loginInfo.getToken());
+			String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload);
+			JsonNode namesResponse = parseJson(result);
 
-		if (!namesResponse.has("names") || !namesResponse.has("analog")) {
-			throw new Exception("Unable to parse names from response. 'names' field missing in response.");
-		}
-		populateAnalogData(namesResponse.at("/analog"), dynamicStatistics);
-		retrieveGroupNames(namesResponse.at("/names"));
-		retrieveOutletNames(namesResponse.at("/names"));
-	}
-
-	/**
-	 * Retrieve and populate the analog data from the given JSON node and populates the provided statistics map.
-	 *
-	 * @param analogJson The JSON node containing analog data.
-	 * @param dynamicStatistics The map to store the processed analog data
-	 */
-	private void populateAnalogData(JsonNode analogJson, Map<String, String> dynamicStatistics) {
-		if (analogJson != null && analogJson.isObject()) {
-			analogJson.fieldNames().forEachRemaining(key -> {
-				String value = analogJson.get(key).asText();
-				String unit = getUnitForKey(key);
-				dynamicStatistics.put(key + unit, value);
-			});
+			if (!namesResponse.has("names") || !namesResponse.has("analog")) {
+				throw new Exception("Unable to parse names from response. 'names' field missing in response.");
+			}
+			handleGetDataByResponse(namesResponse.at("/names"), "outletNames", outletNames);
+			handleGetDataByResponse(namesResponse.at("/names"), "groupNames", groupNames);
+			handleGroupGetDataByResponse(namesResponse.at("/analog"), analogProperty);
+		} catch (Exception e) {
+			throw new ResourceNotReachableException("Unable to retrieve names from response.", e);
 		}
 	}
 
@@ -391,97 +430,49 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 * Retrieves and processes the group names from the given JSON node.
 	 *
 	 * @param namesJson The JSON node containing the "groupNames" data.
-	 * @throws Exception If the "groupNames" field is missing in the provided JSON node.
 	 */
-	private void retrieveGroupNames(JsonNode namesJson) throws Exception {
-		if (namesJson.has("groupNames")) {
-			JsonNode groups = namesJson.at("/groupNames");
-			groupNames.clear();
-			for (Iterator<String> it = groups.fieldNames(); it.hasNext(); ) {
-				String key = it.next();
-				groupNames.add(groups.at("/" + key).asText());
+	private void handleGetDataByResponse(JsonNode namesJson, String groupName, Map<String, String> listName) {
+		if (namesJson.has(groupName)) {
+			JsonNode outletsNode = namesJson.path(groupName);
+			listName.clear();
+			Iterator<Map.Entry<String, JsonNode>> fields = outletsNode.fields();
+			while (fields.hasNext()) {
+				Map.Entry<String, JsonNode> field = fields.next();
+				listName.put(field.getKey(), field.getValue().asText());
 			}
 		} else {
-			throw new Exception("Unable to parse names from response. 'groupNames' fields missing.");
+			throw new ResourceNotReachableException("Unable to parse names from response. 'groupNames' fields missing.");
 		}
 	}
 
 	/**
-	 * Retrieves and processes the outlet names from the given JSON node.
+	 * Retrieves and processes the group names from the given JSON node.
 	 *
-	 * @param namesJson The JSON node containing the "outletNames" data.
-	 * @throws Exception If the "outletNames" field is missing in the provided JSON node.
+	 * @param namesJson The JSON node containing the "groupNames" data.
 	 */
-	private void retrieveOutletNames(JsonNode namesJson) throws Exception {
-		if (namesJson.has("outletNames")) {
-			JsonNode outlets = namesJson.at("/outletNames");
-			outletNames.clear();
-			for (Iterator<String> it = outlets.fieldNames(); it.hasNext(); ) {
-				String key = it.next();
-				String name = outlets.get(key).asText();
-				outletNames.add(key + " " + name);
-			}
-		} else {
-			throw new Exception("Unable to parse names from response. 'outletNames' fields missing.");
+	private void handleGroupGetDataByResponse(JsonNode namesJson, Map<String, String> mapDataResponse) {
+		mapDataResponse.clear();
+		Iterator<Map.Entry<String, JsonNode>> fields = namesJson.fields();
+		while (fields.hasNext()) {
+			Map.Entry<String, JsonNode> field = fields.next();
+			mapDataResponse.put(field.getKey(), field.getValue().asText());
 		}
 	}
 
 	/**
 	 * Retrieves and processes the states of outlets and groups from a remote API response.
-	 *
-	 * @param stats a {@code Map<String, String>} where the states of outlets, groups, and sequences will be stored
-	 * @param controls a {@code List<AdvancedControllableProperty>} where controls for outlets, groups, and sequences will be added
-	 * @throws Exception if the response contains errors, required fields are missing, or parsing fails
 	 */
-	private void retrieveStatesByName(Map<String, String> stats, List<AdvancedControllableProperty> controls) throws Exception {
-		String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, createJsonRetrieveString());
-		JsonNode stateResponse = parseJson(result);
-		checkForErrors(stateResponse);
-
-		populateOutletStates(stateResponse, stats, controls);
-		populateGroupStates(stateResponse, stats, controls);
-		populateSequenceStates(stats, controls);
-	}
-
-	/**
-	 * Populates the states of outlets from the provided JSON response and updates the stats and controls.
-	 *
-	 * @param stateResponse containing the API response with outlet states.
-	 * @param stats to store the state of each outlet.
-	 * @param controls to store control properties for each outlet.
-	 * @throws Exception If the 'outlets' field is missing in the response.
-	 */
-	private void populateOutletStates(JsonNode stateResponse, Map<String, String> stats, List<AdvancedControllableProperty> controls) throws Exception {
-		if (stateResponse.has("outlets")) {
-			JsonNode outletStates = stateResponse.at(DataprobeConstant.RESPONSE_OUTLETS);
-			int outletNumber = 1;
-			for (Iterator<String> it = outletStates.fieldNames(); it.hasNext(); ) {
-				String fieldName = it.next();
-				createOutletStats(outletNumber, fieldName, outletStates.at("/" + fieldName).asText(), stats, controls);
-				outletNumber++;
+	private void retrieveControllingState() {
+		try {
+			String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, createJsonRetrieveString());
+			JsonNode stateResponse = parseJson(result);
+			if (!stateResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean() && !stateResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no Groups")) {
+				throw new ResourceNotReachableException(stateResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 			}
-		} else {
-			throw new Exception("Unable to parse outlet states. 'outlets' field not found.");
-		}
-	}
-
-	/**
-	 * Populates the states of groups from the provided JSON response and updates the stats and controls.
-	 *
-	 * @param stateResponse containing the API response with group states.
-	 * @param stats to store the state of each group.
-	 * @param controls to store control properties for each group.
-	 * @throws Exception If the 'groups' field is missing in the response.
-	 */
-	private void populateGroupStates(JsonNode stateResponse, Map<String, String> stats, List<AdvancedControllableProperty> controls) throws Exception {
-		if (stateResponse.has("groups")) {
-			JsonNode groupStates = stateResponse.at(DataprobeConstant.RESPONSE_GROUPS);
-			for (Iterator<String> it = groupStates.fieldNames(); it.hasNext(); ) {
-				String fieldName = it.next();
-				createGroupStats(fieldName, groupStates.at("/" + fieldName).asText(), stats, controls);
-			}
-		} else {
-			throw new Exception("Unable to parse group states. 'groups' field not found.");
+			handleGroupGetDataByResponse(stateResponse.at("/outlets"), outletStates);
+			handleGroupGetDataByResponse(stateResponse.at("/groups"), groupStates);
+		} catch (Exception e) {
+			throw new ResourceNotReachableException("Can not retrieve the information of the device", e);
 		}
 	}
 
@@ -517,6 +508,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 							);
 							break;
 						default:
+							logger.debug(String.format("The Adaptor is not support this property %s", item.getPropertyName()));
 							break;
 					}
 				}
@@ -546,7 +538,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 					addAdvancedControlProperties(controls, stats,
 							createSwitch(propertyName, status, DataprobeConstant.OFF, DataprobeConstant.ON),
 							String.valueOf(status));
-					stats.put(propertyName, state);
 					break;
 				case CYCLE:
 					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 5), DataprobeConstant.NONE);
@@ -574,16 +565,11 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 					stats.put(propertyName, name);
 					break;
 				case STATUS:
-					if ("?".equals(state)) {
-						stats.put(propertyName, "No outlets in group");
-					} else {
-						stats.put(propertyName, state);
-					}
+					stats.put(propertyName, "?".equals(state) ? "No outlets in group" : state);
 					break;
 				case OUTLET_CONTROL:
 					int status = DataprobeConstant.ON.equalsIgnoreCase(state) ? 1 : 0;
 					addAdvancedControlProperties(controls, stats, createSwitch(propertyName, status, DataprobeConstant.OFF, DataprobeConstant.ON), String.valueOf(status));
-					stats.put(propertyName, state);
 					break;
 				case CYCLE:
 					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 5), DataprobeConstant.NONE);
@@ -604,8 +590,8 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private String createJsonRetrieveString() throws JsonProcessingException {
 		Serialisers.StateRequestObject stateRequestObject = new Serialisers.StateRequestObject(
 				this.loginInfo.getToken(),
-				outletNames.toArray(new String[0]),
-				groupNames.toArray(new String[0])
+				outletNames.keySet().toArray(new String[0]),
+				groupNames.values().toArray(new String[0])
 		);
 		return objectMapper.writeValueAsString(stateRequestObject);
 	}
@@ -670,7 +656,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		if (property != null) {
 			advancedControllableProperties.removeIf(controllableProperty -> controllableProperty.getName().equals(property.getName()));
 
-			String propertyValue = StringUtils.isNotNullOrEmpty(value) ? value : DataprobeConstant.EMPTY;
+			String propertyValue = StringUtils.isNotNullOrEmpty(value) && !DataprobeConstant.NONE.equals(value) ? value : DataprobeConstant.EMPTY;
 			stats.put(property.getName(), propertyValue);
 			advancedControllableProperties.add(property);
 		}
@@ -684,21 +670,10 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 * @throws Exception if an unexpected error occurs during error checking
 	 */
 	private void checkForErrors(JsonNode deviceResponse) throws Exception {
-		if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()) {
-			if (!deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no Groups")) {
-				throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
-			}
+		if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()
+				&& !deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no Groups")) {
+			throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 		}
-	}
-
-	/**
-	 * check value is null or empty
-	 *
-	 * @param value input value
-	 * @return value after checking
-	 */
-	private String getDefaultValueForNullData(String value) {
-		return StringUtils.isNotNullOrEmpty(value) && !"null".equalsIgnoreCase(value) ? uppercaseFirstCharacter(value) : DataprobeConstant.NONE;
 	}
 
 	/**
@@ -719,14 +694,18 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
-	 * capitalize the first character of the string
+	 * Retrieves the Sequence enum based on its default name.
 	 *
-	 * @param input input string
-	 * @return string after fix
+	 * @param name The default name of the control type enum.
+	 * @return The control type enum corresponding to the default name, or unknown if not found.
 	 */
-	private String uppercaseFirstCharacter(String input) {
-		char firstChar = input.charAt(0);
-		return Character.toUpperCase(firstChar) + input.substring(1);
+	public static DataprobeControlType getByDefaultName(String name) {
+		for (DataprobeControlType dataprobeControlType : DataprobeControlType.values()) {
+			if (name.toLowerCase().startsWith(dataprobeControlType.getName())) {
+				return dataprobeControlType;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -745,7 +724,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			}
 			return new ControlObject(this.loginInfo.getToken(), "sequence", command, null, sequence, null);
 		} catch (Exception e) {
-			return null;
+			throw new ResourceNotReachableException("Can not control this sequence", e);
 		}
 	}
 
@@ -761,7 +740,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		int startIndex = controlProperty.indexOf(DataprobeConstant.UNDER_SCORE);
 		int endIndex = controlProperty.indexOf(DataprobeConstant.HASH);
 		String group = controlProperty.substring(startIndex + 1, endIndex);
-		String command = value.equals("1") ? "on" : "off";
+		String command = "1".equals(value) ? "on" : "off";
 		if (controlProperty.contains(DataprobeConstant.CYCLE)) {
 			command = "cycle";
 		}
@@ -778,10 +757,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		try {
 			String controlResponse = this.doPost(DataprobeCommand.CONTROL, objectMapper.writeValueAsString(controlObject));
 			JsonNode deviceResponse = parseJson(controlResponse);
-			if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()) {
-				if (!deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no data")) {
-					throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
-				}
+			if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()
+					&& !deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no data")) {
+				throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 			}
 		} catch (Exception e) {
 			throw new ResourceNotReachableException("Can not control device", e);
@@ -834,36 +812,5 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 */
 	private String formatSequenceName(String sequenceName) {
 		return DataprobeConstant.SEQUENCE + sequenceName;
-	}
-
-	/**
-	 * Uptime is received in seconds, need to normalize it and make it human-readable, like
-	 * 1 day(s) 5 hour(s) 12 minute(s) 55 minute(s)
-	 * Incoming parameter is may have a decimal point, so in order to safely process this - it's rounded first.
-	 * We don't need to add a segment of time if it's 0.
-	 *
-	 * @param uptimeSeconds value in seconds
-	 * @return string value of format 'x day(s) x hour(s) x minute(s) x minute(s)'
-	 */
-	private String normalizeUptime(long uptimeSeconds) {
-		StringBuilder normalizedUptime = new StringBuilder();
-
-		long seconds = uptimeSeconds % 60;
-		long minutes = uptimeSeconds % 3600 / 60;
-		long hours = uptimeSeconds % 86400 / 3600;
-		long days = uptimeSeconds / 86400;
-		if (days > 0) {
-			normalizedUptime.append(days).append(" day(s) ");
-		}
-		if (hours > 0) {
-			normalizedUptime.append(hours).append(" hour(s) ");
-		}
-		if (minutes > 0) {
-			normalizedUptime.append(minutes).append(" minute(s) ");
-		}
-		if (seconds > 0) {
-			normalizedUptime.append(seconds).append(" second(s)");
-		}
-		return normalizedUptime.toString().trim();
 	}
 }

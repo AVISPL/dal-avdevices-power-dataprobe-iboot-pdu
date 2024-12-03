@@ -21,10 +21,8 @@ public class DataprobeConstant {
 	public static final String EMPTY = "";
 	public static final String HASH = "#";
 	public static final String UNDER_SCORE = "_";
-	public static final String INVALID_TOKEN = "invalid token";
 	public static final String OUTLET_COMMAND = "outlet";
 	public static final String GROUP_COMMAND = "group";
-	public static final String SYSTEM = "System";
 
 	/* Response properties */
 	public static final String RESPONSE_SUCCESS = "/success";
@@ -44,13 +42,4 @@ public class DataprobeConstant {
 	public static final String CYCLE = "Cycle";
 	public static final String CYCLING = "Cycling";
 	public static final String STOP = "Stop";
-
-	/* Metadata */
-	public static final String MONITORED_DEVICES_TOTAL = "MonitoredDevicesTotal";
-	public static final String MONITORING_CYCLE_DURATION = "LastMonitoringCycleDuration(s)";
-	public static final String ADAPTER_VERSION = "AdapterVersion";
-	public static final String ADAPTER_BUILD_DATE = "AdapterBuildDate";
-	public static final String ADAPTER_UPTIME_MIN = "AdapterUptime(min)";
-	public static final String ADAPTER_UPTIME = "AdapterUptime";
-	public static final String ADAPTER_RUNNER_SIZE = "RunnerSize(kB)";
 }

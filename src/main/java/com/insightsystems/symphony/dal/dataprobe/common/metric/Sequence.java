@@ -4,9 +4,6 @@
 
 package com.insightsystems.symphony.dal.dataprobe.common.metric;
 
-import java.util.Arrays;
-import java.util.Optional;
-
 /**
  * Enum representing different types of Sequence settings
  *
@@ -62,17 +59,6 @@ public enum Sequence {
 	 */
 	public String getValue() {
 		return value;
-	}
-
-	/**
-	 * Retrieves the Sequence enum based on its default name.
-	 *
-	 * @param name The default name of the Sequence enum.
-	 * @return The Sequence enum corresponding to the default name, or null if not found.
-	 */
-	public static Sequence getByDefaultName(String name) {
-		Optional<Sequence> property = Arrays.stream(values()).filter(item -> item.getPropertyName().equalsIgnoreCase(name)).findFirst();
-		return property.orElse(null);
 	}
 }
 

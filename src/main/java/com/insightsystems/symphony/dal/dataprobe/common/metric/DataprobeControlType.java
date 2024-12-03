@@ -4,11 +4,6 @@
 
 package com.insightsystems.symphony.dal.dataprobe.common.metric;
 
-import java.util.Arrays;
-import java.util.Optional;
-
-import com.insightsystems.symphony.dal.dataprobe.common.DataprobeConstant;
-
 /**
  * Enum representing different types of Control type settings
  *
@@ -28,10 +23,10 @@ public enum DataprobeControlType {
 	/**
 	 * Constructor for Sequence.
 	 *
-	 * @param defaultName The name of the sequence property.
+	 * @param name The name of the sequence property.
 	 */
-	DataprobeControlType(String defaultName) {
-		this.name = defaultName;
+	DataprobeControlType(String name) {
+		this.name = name;
 	}
 
 	/**
@@ -43,25 +38,5 @@ public enum DataprobeControlType {
 		return name;
 	}
 
-	/**
-	 * Retrieves the Sequence enum based on its default name.
-	 *
-	 * @param name The default name of the control type enum.
-	 * @return The control type enum corresponding to the default name, or unknown if not found.
-	 */
-	public static DataprobeControlType getByDefaultName(String name) {
-		if (name.startsWith(DataprobeConstant.OUTLET)) {
-			return DataprobeControlType.OUTLET;
-		}
-
-		if (name.startsWith(DataprobeConstant.GROUP)) {
-			return DataprobeControlType.GROUP;
-		}
-
-		if (name.startsWith(DataprobeConstant.SEQUENCE)) {
-			return DataprobeControlType.SEQUENCE;
-		}
-		return DataprobeControlType.UNKNOWN;
-	}
 }
 

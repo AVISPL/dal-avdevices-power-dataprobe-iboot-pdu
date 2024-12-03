@@ -6,12 +6,10 @@ package com.insightsystems.dal.dataprobe;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import com.insightsystems.symphony.dal.dataprobe.DataprobeiBootPDUCommunicator;
 import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +38,7 @@ public class DataprobeiBootPDUCommunicatorTest {
 		dataprobeiBootPDUCommunicator.setPassword("");
 		dataprobeiBootPDUCommunicator.init();
 		dataprobeiBootPDUCommunicator.connect();
-		dataprobeiBootPDUCommunicator.setSequenceProperties("01, 02, 03");
+		dataprobeiBootPDUCommunicator.setSequenceNames("01, 02, 03");
 	}
 
 	@AfterEach
@@ -61,15 +59,15 @@ public class DataprobeiBootPDUCommunicatorTest {
 		ExtendedStatistics es = (ExtendedStatistics) statistics.get(0);
 
 		Map<String,String> stats = ((ExtendedStatistics)dataprobeiBootPDUCommunicator.getMultipleStatistics().get(0)).getStatistics();
-		Assert.assertEquals("1",stats.get("1: Outlet_1"));
-		Assert.assertEquals("1",stats.get("2: Outlet_2"));
-		Assert.assertEquals("1",stats.get("3: Outlet_3"));
-		Assert.assertEquals("1",stats.get("4: Outlet_4"));
-		Assert.assertEquals("1",stats.get("5: Outlet_5"));
-		Assert.assertEquals("1",stats.get("6: Outlet_6"));
-		Assert.assertEquals("1",stats.get("7: Outlet_7"));
-		Assert.assertEquals("1",stats.get("8: Outlet_8"));
 		System.out.println(stats);
+		Assert.assertEquals("VNOC-QSYS-DSP",stats.get("Outlet_1#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_2#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_3#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_4#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_5#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_6#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_7#Name"));
+		Assert.assertEquals("Spare",stats.get("Outlet_8#Name"));
 	}
 
 	@Test
@@ -88,13 +86,12 @@ public class DataprobeiBootPDUCommunicatorTest {
 		cp.setProperty(updateSequence);
 		cp.setValue("run");
 		dataprobeiBootPDUCommunicator.controlProperty(cp);
-		Thread.sleep(8500);
 	}
 
 	@Test
 	public void testCycle() throws Exception {
 		dataprobeiBootPDUCommunicator.getMultipleStatistics();
-		String updateSequence = "Group_group01#Cycle";
+		String updateSequence = "Group_01#Cycle";
 		ControllableProperty cp = new ControllableProperty();
 		cp.setProperty(updateSequence);
 		dataprobeiBootPDUCommunicator.controlProperty(cp);

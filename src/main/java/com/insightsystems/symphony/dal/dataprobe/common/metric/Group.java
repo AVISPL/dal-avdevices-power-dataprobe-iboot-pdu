@@ -4,9 +4,6 @@
 
 package com.insightsystems.symphony.dal.dataprobe.common.metric;
 
-import java.util.Arrays;
-import java.util.Optional;
-
 /**
  * Enum representing different types of Group settings
  *
@@ -64,17 +61,6 @@ public enum Group {
 	 */
 	public String getValue() {
 		return value;
-	}
-
-	/**
-	 * Retrieves the Group enum based on its default name.
-	 *
-	 * @param name The default name of the Group enum.
-	 * @return The Group enum corresponding to the default name, or null if not found.
-	 */
-	public static Group getByDefaultName(String name) {
-		Optional<Group> property = Arrays.stream(values()).filter(item -> item.getPropertyName().equalsIgnoreCase(name)).findFirst();
-		return property.orElse(null);
 	}
 }
 

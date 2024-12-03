@@ -4,9 +4,6 @@
 
 package com.insightsystems.symphony.dal.dataprobe.common.metric;
 
-import java.util.Arrays;
-import java.util.Optional;
-
 /**
  * Enum representing different types of Outlet settings
  *
@@ -65,14 +62,4 @@ public enum Outlet {
 		return value;
 	}
 
-	/**
-	 * Retrieves the Outlet enum based on its default name.
-	 *
-	 * @param name The default name of the Outlet enum.
-	 * @return The Outlet enum corresponding to the default name, or null if not found.
-	 */
-	public static Outlet getByDefaultName(String name) {
-		Optional<Outlet> property = Arrays.stream(values()).filter(item -> item.getPropertyName().equalsIgnoreCase(name)).findFirst();
-		return property.orElse(null);
-	}
 }
