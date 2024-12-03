@@ -22,7 +22,6 @@ import com.avispl.symphony.api.dal.dto.control.AdvancedControllableProperty;
 
 import org.springframework.util.CollectionUtils;
 
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -347,7 +346,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Populate analog data
-	 *
+	 * @param stats store analog to display UI
 	 * @param dynamicStatistics store analog to db
 	 */
 	private void populateAnalogData(Map<String, String> stats, Map<String, String> dynamicStatistics) {
@@ -430,10 +429,12 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		if (namesJson.has(groupName)) {
 			JsonNode outletsNode = namesJson.path(groupName);
 			listName.clear();
-			Iterator<Map.Entry<String, JsonNode>> fields = outletsNode.fields();
-			while (fields.hasNext()) {
-				Map.Entry<String, JsonNode> field = fields.next();
-				listName.put(field.getKey(), field.getValue().asText());
+			if(outletsNode != null) {
+				Iterator<Map.Entry<String, JsonNode>> fields = outletsNode.fields();
+				while (fields.hasNext()) {
+					Map.Entry<String, JsonNode> field = fields.next();
+					listName.put(field.getKey(), field.getValue().asText());
+				}
 			}
 		} else {
 			throw new ResourceNotReachableException("Unable to parse names from response. 'groupNames' fields missing.");
@@ -447,10 +448,12 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 */
 	private void handleGroupGetDataByResponse(JsonNode namesJson, Map<String, String> mapDataResponse) {
 		mapDataResponse.clear();
-		Iterator<Map.Entry<String, JsonNode>> fields = namesJson.fields();
-		while (fields.hasNext()) {
-			Map.Entry<String, JsonNode> field = fields.next();
-			mapDataResponse.put(field.getKey(), field.getValue().asText());
+		if(namesJson != null) {
+			Iterator<Map.Entry<String, JsonNode>> fields = namesJson.fields();
+			while (fields.hasNext()) {
+				Map.Entry<String, JsonNode> field = fields.next();
+				mapDataResponse.put(field.getKey(), field.getValue().asText());
+			}
 		}
 	}
 
@@ -490,7 +493,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 							addAdvancedControlProperties(
 									controls,
 									stats,
-									createButton(sequence, "Run", "Running", 5),
+									createButton(sequence, "Run", "Running", 0),
 									DataprobeConstant.NONE
 							);
 							break;
@@ -498,7 +501,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 							addAdvancedControlProperties(
 									controls,
 									stats,
-									createButton(sequence, "Stop", "Stopping", 5),
+									createButton(sequence, "Stop", "Stopping", 0),
 									DataprobeConstant.NONE
 							);
 							break;
@@ -535,7 +538,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 							String.valueOf(status));
 					break;
 				case CYCLE:
-					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 5), DataprobeConstant.NONE);
+					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 0), DataprobeConstant.NONE);
 					break;
 				default:
 					stats.put(propertyName, state);
@@ -567,7 +570,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 					addAdvancedControlProperties(controls, stats, createSwitch(propertyName, status, DataprobeConstant.OFF, DataprobeConstant.ON), String.valueOf(status));
 					break;
 				case CYCLE:
-					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 5), DataprobeConstant.NONE);
+					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 0), DataprobeConstant.NONE);
 					break;
 				default:
 					stats.put(propertyName, state);
