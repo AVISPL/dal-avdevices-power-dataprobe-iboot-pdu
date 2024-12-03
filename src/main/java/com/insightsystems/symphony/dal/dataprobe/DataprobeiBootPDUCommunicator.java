@@ -98,11 +98,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private boolean isEmergencyDelivery;
 
 	/**
-	 * A cache that maps route names to their corresponding values.
-	 */
-	private final Map<String, String> cacheValue = new HashMap<>();
-
-	/**
 	 * A mapper for reading and writing JSON using Jackson library.
 	 * ObjectMapper provides functionality for converting between Java objects and JSON.
 	 * It can be used to serialize objects to JSON format, and deserialize JSON data to objects.
@@ -268,7 +263,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		String jsonPayload = String.format(DataprobeConstant.AUTHENTICATION_PARAM, this.getLogin(), this.getPassword());
 		try {
 			String result = this.doPost(DataprobeCommand.API_LOGIN, jsonPayload);
-			JsonNode response = parseJson(result);
+			JsonNode response = objectMapper.readTree(result);
 			if (response.has("success")) {
 				if (response.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()) {
 					String token = response.at("/token").asText();
@@ -389,7 +384,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			logger.debug("Internal destroy is called.");
 		}
 		localExtendedStatistics = null;
-		cacheValue.clear();
 		super.internalDestroy();
 	}
 
@@ -413,7 +407,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		try {
 			String jsonPayload = String.format(DataprobeConstant.RETRIEVE_NAME, this.loginInfo.getToken());
 			String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, jsonPayload);
-			JsonNode namesResponse = parseJson(result);
+			JsonNode namesResponse = objectMapper.readTree(result);
 
 			if (!namesResponse.has("names") || !namesResponse.has("analog")) {
 				throw new Exception("Unable to parse names from response. 'names' field missing in response.");
@@ -428,8 +422,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Retrieves and processes the group names from the given JSON node.
-	 *
-	 * @param namesJson The JSON node containing the "groupNames" data.
+	 * @param namesJson The JSON node containing the "groupNames" data.param namesJson
+	 * @param groupName The group name of property
+	 * @param listName  The list name to store property
 	 */
 	private void handleGetDataByResponse(JsonNode namesJson, String groupName, Map<String, String> listName) {
 		if (namesJson.has(groupName)) {
@@ -447,8 +442,8 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Retrieves and processes the group names from the given JSON node.
-	 *
-	 * @param namesJson The JSON node containing the "groupNames" data.
+	 * @param namesJson the Json return data
+	 * @param mapDataResponse the store to map data from response
 	 */
 	private void handleGroupGetDataByResponse(JsonNode namesJson, Map<String, String> mapDataResponse) {
 		mapDataResponse.clear();
@@ -465,7 +460,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private void retrieveControllingState() {
 		try {
 			String result = this.doPost(DataprobeCommand.RETRIEVE_INFO, createJsonRetrieveString());
-			JsonNode stateResponse = parseJson(result);
+			JsonNode stateResponse = objectMapper.readTree(result);
 			if (!stateResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean() && !stateResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no Groups")) {
 				throw new ResourceNotReachableException(stateResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 			}
@@ -597,16 +592,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	}
 
 	/**
-	 * Parses the given JSON string and converts it into a JsonNode object.
-	 *
-	 * @param json The JSON string to be parsed.
-	 * @return A JsonNode representing the parsed JSON structure.
-	 */
-	private JsonNode parseJson(String json) throws Exception {
-		return objectMapper.readTree(json);
-	}
-
-	/**
 	 * Create switch is control property for metric
 	 *
 	 * @param name the name of property
@@ -659,20 +644,6 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			String propertyValue = StringUtils.isNotNullOrEmpty(value) && !DataprobeConstant.NONE.equals(value) ? value : DataprobeConstant.EMPTY;
 			stats.put(property.getName(), propertyValue);
 			advancedControllableProperties.add(property);
-		}
-	}
-
-	/**
-	 * Checks the device response for errors and throws an exception if any error is detected.
-	 *
-	 * @param deviceResponse the JSON response from the device to be checked for errors
-	 * @throws ResourceNotReachableException if the response indicates failure and the error message is unexpected
-	 * @throws Exception if an unexpected error occurs during error checking
-	 */
-	private void checkForErrors(JsonNode deviceResponse) throws Exception {
-		if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()
-				&& !deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no Groups")) {
-			throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 		}
 	}
 
@@ -756,7 +727,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private void sendCommandToControlDevice(ControlObject controlObject) {
 		try {
 			String controlResponse = this.doPost(DataprobeCommand.CONTROL, objectMapper.writeValueAsString(controlObject));
-			JsonNode deviceResponse = parseJson(controlResponse);
+			JsonNode deviceResponse = objectMapper.readTree(controlResponse);
 			if (!deviceResponse.at(DataprobeConstant.RESPONSE_SUCCESS).asBoolean()
 					&& !deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText().contains("There are no data")) {
 				throw new ResourceNotReachableException(deviceResponse.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
