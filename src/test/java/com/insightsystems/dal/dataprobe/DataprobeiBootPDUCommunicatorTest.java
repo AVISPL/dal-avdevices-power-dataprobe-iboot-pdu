@@ -38,7 +38,7 @@ public class DataprobeiBootPDUCommunicatorTest {
 		dataprobeiBootPDUCommunicator.setPassword("");
 		dataprobeiBootPDUCommunicator.init();
 		dataprobeiBootPDUCommunicator.connect();
-		dataprobeiBootPDUCommunicator.setSequenceNames("01, 02, 03");
+		dataprobeiBootPDUCommunicator.setSequenceNames("01");
 	}
 
 	@AfterEach
