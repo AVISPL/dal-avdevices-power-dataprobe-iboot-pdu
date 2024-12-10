@@ -23,6 +23,8 @@ public class DataprobeConstant {
 	public static final String UNDER_SCORE = "_";
 	public static final String OUTLET_COMMAND = "outlet";
 	public static final String GROUP_COMMAND = "group";
+	public static final String TEMPERATURE_GROUP = "Temperature";
+	public static final String TEMPERATURE_T1_PROBE = "TemperatureT1Probe";
 
 	/* Response properties */
 	public static final String RESPONSE_SUCCESS = "/success";

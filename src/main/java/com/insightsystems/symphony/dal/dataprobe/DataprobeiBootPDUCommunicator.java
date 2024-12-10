@@ -69,7 +69,7 @@ import com.avispl.symphony.dal.util.StringUtils;
  * <p>
  * Controlling:
  * <li>On/Off/Cycle Outlets and Group config</li>
- * <li>Run/Stop Sequence config</li>
+ * <li>Run Sequence config</li>
  *
  * @author Harry / Symphony Dev Team<br>
  * Created on 11/24/2024
@@ -355,11 +355,19 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			String unit = getUnitForKey(key);
 			String value = item.getValue();
 			boolean isHistorical = historicalProperties.contains(key);
+			String getCustomKey;
+			if (DataprobeConstant.T0.equals(key)) {
+				getCustomKey = DataprobeConstant.TEMPERATURE_GROUP + key + unit;
+			} else if (key.contains(DataprobeConstant.T1)) {
+				getCustomKey = DataprobeConstant.TEMPERATURE_T1_PROBE + unit;
+			} else {
+				getCustomKey = key + unit;
+			}
 			if (isHistorical) {
-				dynamicStatistics.put(key + unit, value);
+				dynamicStatistics.put(getCustomKey, value);
 				continue;
 			}
-			stats.put(key + unit, value);
+			stats.put(getCustomKey, value);
 		}
 	}
 
@@ -497,14 +505,14 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 									DataprobeConstant.NONE
 							);
 							break;
-						case STOP:
-							addAdvancedControlProperties(
-									controls,
-									stats,
-									createButton(sequence, "Stop", "Stopping", 0),
-									DataprobeConstant.NONE
-							);
-							break;
+//						case STOP:
+//							addAdvancedControlProperties(
+//									controls,
+//									stats,
+//									createButton(sequence, "Stop", "Stopping", 0),
+//									DataprobeConstant.NONE
+//							);
+//							break;
 						default:
 							logger.debug(String.format("The Adaptor is not support this property %s", item.getPropertyName()));
 							break;
@@ -693,9 +701,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			int endIndex = controlProperty.indexOf(DataprobeConstant.HASH);
 			String sequence = controlProperty.substring(startIndex + 1, endIndex);
 			String command = "run";
-			if (controlProperty.contains(DataprobeConstant.STOP)) {
-				command = "stop";
-			}
+//			if (controlProperty.contains(DataprobeConstant.STOP)) {
+//				command = "stop";
+//			}
 			return new ControlObject(this.loginInfo.getToken(), "sequence", command, null, sequence, null);
 		} catch (Exception e) {
 			throw new ResourceNotReachableException("Can not control this sequence", e);
