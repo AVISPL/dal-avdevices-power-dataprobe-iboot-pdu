@@ -357,7 +357,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			boolean isHistorical = historicalProperties.contains(key);
 			String getCustomKey;
 			if (DataprobeConstant.T0.equals(key)) {
-				getCustomKey = DataprobeConstant.TEMPERATURE_GROUP + key + unit;
+				getCustomKey = DataprobeConstant.TEMPERATURE + unit;
 			} else if (key.contains(DataprobeConstant.T1)) {
 				getCustomKey = DataprobeConstant.TEMPERATURE_T1_PROBE + unit;
 			} else {
