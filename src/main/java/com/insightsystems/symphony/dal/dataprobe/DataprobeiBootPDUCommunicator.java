@@ -351,10 +351,11 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	 */
 	private void populateAnalogData(Map<String, String> stats, Map<String, String> dynamicStatistics) {
 		for (Entry<String, String> item : analogProperty.entrySet()) {
+			boolean isCurrentCase = item.getKey().contains(DataprobeConstant.CURRENT);
+			double currentValue = Double.parseDouble(item.getValue());
 			String key = item.getKey();
 			String unit = getUnitForKey(key);
-			String value = item.getValue();
-			boolean isHistorical = historicalProperties.contains(key);
+			String value = isCurrentCase ? String.valueOf(currentValue * 1000) : item.getValue();
 			String getCustomKey;
 			if (DataprobeConstant.T0.equals(key)) {
 				getCustomKey = DataprobeConstant.TEMPERATURE + unit;
@@ -363,11 +364,14 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			} else {
 				getCustomKey = key + unit;
 			}
-			if (isHistorical) {
-				dynamicStatistics.put(getCustomKey, value);
-				continue;
+			boolean isHistorical = historicalProperties.contains(getCustomKey);
+			if(currentValue < DataprobeConstant.MAXIMUM_CURRENT_VALUE){
+				if (isHistorical) {
+					dynamicStatistics.put(getCustomKey, value);
+					continue;
+				}
+				stats.put(getCustomKey, value);
 			}
-			stats.put(getCustomKey, value);
 		}
 	}
 

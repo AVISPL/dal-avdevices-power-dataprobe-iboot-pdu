@@ -25,6 +25,7 @@ public class DataprobeConstant {
 	public static final String GROUP_COMMAND = "group";
 	public static final String TEMPERATURE = "TemperatureT1";
 	public static final String TEMPERATURE_T1_PROBE = "TemperatureT2";
+	public static final Double MAXIMUM_CURRENT_VALUE = 999.9;
 
 	/* Response properties */
 	public static final String RESPONSE_SUCCESS = "/success";
