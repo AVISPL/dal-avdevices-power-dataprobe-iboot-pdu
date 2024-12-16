@@ -725,12 +725,15 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	private ControlObject handleOutletAndGroupControl(String controlProperty, String value, String groupName) {
 		int startIndex = controlProperty.indexOf(DataprobeConstant.UNDER_SCORE);
 		int endIndex = controlProperty.indexOf(DataprobeConstant.HASH);
-		String group = controlProperty.substring(startIndex + 1, endIndex);
+		String item = controlProperty.substring(startIndex + 1, endIndex);
 		String command = "1".equals(value) ? "on" : "off";
 		if (controlProperty.contains(DataprobeConstant.CYCLE)) {
 			command = "cycle";
 		}
-		return new ControlObject(this.loginInfo.getToken(), groupName, command, null, null, group);
+		if(DataprobeConstant.OUTLET_COMMAND.equals(groupName)){
+			return new ControlObject(this.loginInfo.getToken(), groupName, command, new String[]{item}, null, null);
+		}
+		return new ControlObject(this.loginInfo.getToken(), groupName, command, null, null, item);
 	}
 
 	/**
