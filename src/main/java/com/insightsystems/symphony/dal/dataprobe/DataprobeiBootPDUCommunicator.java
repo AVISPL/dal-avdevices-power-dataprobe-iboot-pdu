@@ -204,10 +204,10 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 	@Override
 	public void controlProperty(ControllableProperty controllableProperty) throws Exception {
 		reentrantLock.lock();
-		if (localExtendedStatistics == null) {
-			return;
-		}
 		try {
+			if (localExtendedStatistics == null) {
+				return;
+			}
 			Map<String, String> stats = localExtendedStatistics.getStatistics();
 			List<AdvancedControllableProperty> advancedControllableProperties = localExtendedStatistics.getControllableProperties();
 			String controlProperty = controllableProperty.getProperty();
@@ -346,6 +346,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Populate analog data
+	 *
 	 * @param stats store analog to display UI
 	 * @param dynamicStatistics store analog to db
 	 */
@@ -365,7 +366,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 				getCustomKey = key + unit;
 			}
 			boolean isHistorical = historicalProperties.contains(getCustomKey);
-			if(currentValue < DataprobeConstant.MAXIMUM_CURRENT_VALUE){
+			if (currentValue < DataprobeConstant.MAXIMUM_CURRENT_VALUE) {
 				if (isHistorical) {
 					dynamicStatistics.put(getCustomKey, value);
 					continue;
@@ -423,9 +424,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			if (!namesResponse.has("names") || !namesResponse.has("analog")) {
 				throw new Exception("Unable to parse names from response. 'names' field missing in response.");
 			}
-			handleGetDataByResponse(namesResponse.at("/names"), "outletNames", outletNames);
-			handleGetDataByResponse(namesResponse.at("/names"), "groupNames", groupNames);
-			handleGroupGetDataByResponse(namesResponse.at("/analog"), analogProperty);
+			handleGetDataByResponse(namesResponse.at(DataprobeConstant.RESPONSE_NAMES), "outletNames", outletNames);
+			handleGetDataByResponse(namesResponse.at(DataprobeConstant.RESPONSE_NAMES), "groupNames", groupNames);
+			handleGroupGetDataByResponse(namesResponse.at(DataprobeConstant.RESPONSE_ANALOG), analogProperty);
 		} catch (Exception e) {
 			throw new ResourceNotReachableException("Unable to retrieve names from response.", e);
 		}
@@ -433,15 +434,16 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Retrieves and processes the group names from the given JSON node.
+	 *
 	 * @param namesJson The JSON node containing the "groupNames" data.param namesJson
 	 * @param groupName The group name of property
-	 * @param listName  The list name to store property
+	 * @param listName The list name to store property
 	 */
 	private void handleGetDataByResponse(JsonNode namesJson, String groupName, Map<String, String> listName) {
 		if (namesJson.has(groupName)) {
 			JsonNode outletsNode = namesJson.path(groupName);
 			listName.clear();
-			if(outletsNode != null) {
+			if (outletsNode != null) {
 				Iterator<Map.Entry<String, JsonNode>> fields = outletsNode.fields();
 				while (fields.hasNext()) {
 					Map.Entry<String, JsonNode> field = fields.next();
@@ -455,12 +457,13 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 
 	/**
 	 * Retrieves and processes the group names from the given JSON node.
+	 *
 	 * @param namesJson the Json return data
 	 * @param mapDataResponse the store to map data from response
 	 */
 	private void handleGroupGetDataByResponse(JsonNode namesJson, Map<String, String> mapDataResponse) {
 		mapDataResponse.clear();
-		if(namesJson != null) {
+		if (namesJson != null) {
 			Iterator<Map.Entry<String, JsonNode>> fields = namesJson.fields();
 			while (fields.hasNext()) {
 				Map.Entry<String, JsonNode> field = fields.next();
@@ -730,8 +733,8 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		if (controlProperty.contains(DataprobeConstant.CYCLE)) {
 			command = "cycle";
 		}
-		if(DataprobeConstant.OUTLET_COMMAND.equals(groupName)){
-			return new ControlObject(this.loginInfo.getToken(), groupName, command, new String[]{item}, null, null);
+		if (DataprobeConstant.OUTLET_COMMAND.equals(groupName)) {
+			return new ControlObject(this.loginInfo.getToken(), groupName, command, new String[] { item }, null, null);
 		}
 		return new ControlObject(this.loginInfo.getToken(), groupName, command, null, null, item);
 	}

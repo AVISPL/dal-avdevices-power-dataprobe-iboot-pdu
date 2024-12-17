@@ -30,7 +30,8 @@ public class DataprobeConstant {
 	/* Response properties */
 	public static final String RESPONSE_SUCCESS = "/success";
 	public static final String RESPONSE_MESSAGE = "/message";
-	public static final String RESPONSE_OUTLETS = "/outlets";
+	public static final String RESPONSE_NAMES = "/names";
+	public static final String RESPONSE_ANALOG = "/analog";
 	public static final String RESPONSE_GROUPS = "/groups";
 
 	/* Analog properties */
