@@ -424,8 +424,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 			if (!namesResponse.has("names") || !namesResponse.has("analog")) {
 				throw new Exception("Unable to parse names from response. 'names' field missing in response.");
 			}
-			handleGetDataByResponse(namesResponse.at(DataprobeConstant.RESPONSE_NAMES), "outletNames", outletNames);
-			handleGetDataByResponse(namesResponse.at(DataprobeConstant.RESPONSE_NAMES), "groupNames", groupNames);
+			JsonNode responseNamesNode = namesResponse.at(DataprobeConstant.RESPONSE_NAMES);
+			handleGetDataByResponse(responseNamesNode, "outletNames", outletNames);
+			handleGetDataByResponse(responseNamesNode, "groupNames", groupNames);
 			handleGroupGetDataByResponse(namesResponse.at(DataprobeConstant.RESPONSE_ANALOG), analogProperty);
 		} catch (Exception e) {
 			throw new ResourceNotReachableException("Unable to retrieve names from response.", e);
