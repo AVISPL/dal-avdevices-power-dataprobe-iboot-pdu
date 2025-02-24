@@ -510,17 +510,9 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 									controls,
 									stats,
 									createButton(sequence, "Run", "Running", 0),
-									DataprobeConstant.NONE
+									"N/A"
 							);
 							break;
-//						case STOP:
-//							addAdvancedControlProperties(
-//									controls,
-//									stats,
-//									createButton(sequence, "Stop", "Stopping", 0),
-//									DataprobeConstant.NONE
-//							);
-//							break;
 						default:
 							logger.debug(String.format("The Adaptor is not support this property %s", item.getPropertyName()));
 							break;
@@ -554,7 +546,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 							String.valueOf(status));
 					break;
 				case CYCLE:
-					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 0), DataprobeConstant.NONE);
+					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 0), "N/A");
 					break;
 				default:
 					stats.put(propertyName, state);
@@ -586,7 +578,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 					addAdvancedControlProperties(controls, stats, createSwitch(propertyName, status, DataprobeConstant.OFF, DataprobeConstant.ON), String.valueOf(status));
 					break;
 				case CYCLE:
-					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 0), DataprobeConstant.NONE);
+					addAdvancedControlProperties(controls, stats, createButton(propertyName, DataprobeConstant.CYCLE, DataprobeConstant.CYCLING, 0), "N/A");
 					break;
 				default:
 					stats.put(propertyName, state);
@@ -645,7 +637,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 		button.setLabel(label);
 		button.setLabelPressed(labelPressed);
 		button.setGracePeriod(gracePeriod);
-		return new AdvancedControllableProperty(name, new Date(), button, DataprobeConstant.EMPTY);
+		return new AdvancedControllableProperty(name, new Date(), button, "N/A");
 	}
 
 	/**
