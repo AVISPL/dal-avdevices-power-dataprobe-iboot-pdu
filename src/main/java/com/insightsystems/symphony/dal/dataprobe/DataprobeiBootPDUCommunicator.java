@@ -34,7 +34,6 @@ import com.insightsystems.symphony.dal.dataprobe.common.metric.Group;
 import com.insightsystems.symphony.dal.dataprobe.common.metric.Outlet;
 import com.insightsystems.symphony.dal.dataprobe.common.metric.Sequence;
 import javax.security.auth.login.FailedLoginException;
-import org.apache.http.auth.InvalidCredentialsException;
 
 import com.avispl.symphony.api.dal.control.Controller;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
@@ -272,7 +271,7 @@ public class DataprobeiBootPDUCommunicator extends RestCommunicator implements M
 					loginInfo.setToken(token);
 				} else {
 					loginInfo = null;
-					throw new InvalidCredentialsException(response.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
+					throw new FailedLoginException(response.at(DataprobeConstant.RESPONSE_MESSAGE).asText());
 				}
 			}
 		} catch (Exception e) {
